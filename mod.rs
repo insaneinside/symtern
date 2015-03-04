@@ -1,8 +1,8 @@
-///! Symbol- and name-storage facilities.
-///!
-///! This is based on [Servo's string-cache
-///! library](https://github.com/servo/string-cache); at the moment it's very
-///! lifetime-unsafe for `Pooled` instances.
+//! Symbol- and name-storage facilities.
+//!
+//! This is based on [Servo's string-cache
+//! library](https://github.com/servo/string-cache); at the moment it's very
+//! lifetime-unsafe for `Pooled` instances.
 use std;
 use std::fmt;
 use std::slice::bytes;
@@ -21,9 +21,19 @@ pub use self::nameable::Nameable;
 
 /// Methods required of `unpacked` types.
 pub trait PackFormat {
+    /// Pack an unpacked symbol in the implementing format into a generic
+    /// Symbol object.
     fn pack(&self) -> Symbol;
-    fn unpack(sym: &Symbol) -> Self;
-    fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str;
+
+    /// Unpack a generic Symbol into the implementing format.  This function is
+    /// marked as `unsafe` because the caller must verify that the symbol is
+    /// indeed packed by the receiver's implementation.
+    unsafe fn unpack(sym: &Symbol) -> Self;
+
+    /// Fetch a `&str` slice from a symbol packed in the implementing format.
+    /// This function is marked as `unsafe` because the caller must verify that
+    /// the symbol is indeed packed by the receiver's implementation.
+    unsafe fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str;
 }
 
 
@@ -37,9 +47,11 @@ pub struct Pool {
 }
 
 impl Pool {
+    /// Create a new symbol pool.
     pub fn new() -> Pool {
         Pool{refcount: 1, map: BTreeMap::new()}
     }
+    /// Fetch a symbol corresponding to the given string.  If if
     pub fn symbol(&mut self, name: &str) -> Symbol {
         if name.len() <= INLINE_SYMBOL_MAX_LEN
         { Inline::new(name).pack() }
