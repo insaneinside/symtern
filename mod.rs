@@ -85,6 +85,17 @@ impl Symbol {
     { <Unpacked as PackFormat>::unpack(self) }
 }
 
+    /// Get symbol's pack format.
+    #[inline(always)]
+    pub fn type_of(&self) -> Type {
+        match (self.value[0] & 0x01) as u8 {
+            INLINE => Type::INLINE,
+            POOLED => Type::POOLED,
+            _ => unreachable!()
+        }
+    }
+
+}
 
 impl std::str::Str for Symbol {
     fn as_slice<'t>(&'t self) -> &'t str { <Unpacked as PackFormat>::as_slice_from(self) }
@@ -289,16 +300,16 @@ impl PackFormat for Unpacked {
     }
 
     fn unpack(sym: &Symbol) -> Unpacked {
-        match Unpacked::type_of(sym) {
-            Type::POOLED => Unpacked::Pooled(<Pooled as PackFormat>::unpack(sym)),
-            Type::INLINE => Unpacked::Inline(<Inline as PackFormat>::unpack(sym)),
+        match sym.type_of() {
+            Type::POOLED => Unpacked::Pooled(unsafe { <Pooled as PackFormat>::unpack(sym) }),
+            Type::INLINE => Unpacked::Inline(unsafe { <Inline as PackFormat>::unpack(sym) }),
         }
     }
 
     fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
-        match Unpacked::type_of(sym) {
-            Type::INLINE => <Inline as PackFormat>::as_slice_from(sym),
-            Type::POOLED => <Pooled as PackFormat>::as_slice_from(sym)
+        match sym.type_of() {
+            Type::INLINE => unsafe { <Inline as PackFormat>::as_slice_from(sym) },
+            Type::POOLED => unsafe { <Pooled as PackFormat>::as_slice_from(sym) }
         }
     }
 }
@@ -326,12 +337,4 @@ impl std::cmp::PartialEq for Unpacked {
 
 
 impl Unpacked {
-    #[inline(always)]
-    pub fn type_of(sym: &Symbol) -> Type {
-        match (sym.value[0] & 0x01) as u8 {
-            INLINE => Type::INLINE,
-            POOLED => Type::POOLED,
-            _ => unreachable!()
-        }
-    }
 }
