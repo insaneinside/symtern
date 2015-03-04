@@ -8,14 +8,13 @@ use std::fmt;
 use std::slice::bytes;
 use std::hash::{hash, Hash, Hasher, SipHasher};
 use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 use std::borrow::ToOwned;
 
 
 use super::util::intrusive;
 
 #[macro_use]
-mod nameable;
+pub mod nameable;
 pub use self::nameable::Nameable;
 
 
@@ -41,6 +40,7 @@ pub trait PackFormat {
  * Pool
  */
 /// A collection of symbols.
+#[derive(Debug)]
 pub struct Pool {
     refcount: usize,
     map:  BTreeMap<u64,String>
@@ -82,8 +82,7 @@ impl Symbol {
     /// Convert the symbol to its unpacked representation.
     #[inline(always)]
     pub fn unpack(&self) -> Unpacked
-    { <Unpacked as PackFormat>::unpack(self) }
-}
+    { unsafe { <Unpacked as PackFormat>::unpack(self) } }
 
     /// Get symbol's pack format.
     #[inline(always)]
@@ -98,7 +97,7 @@ impl Symbol {
 }
 
 impl std::str::Str for Symbol {
-    fn as_slice<'t>(&'t self) -> &'t str { <Unpacked as PackFormat>::as_slice_from(self) }
+    fn as_slice<'t>(&'t self) -> &'t str { unsafe { <Unpacked as PackFormat>::as_slice_from(self) } }
 }
 
 impl Nameable for Symbol {
