@@ -1,4 +1,4 @@
-///! Defines the `Nameable` trait, for objects with names.
+//! Defines the `Nameable` trait, for objects with names.
 use super::Symbol;
 use std::fmt;
 
