@@ -11,8 +11,6 @@ use std::collections::BTreeMap;
 use std::borrow::ToOwned;
 
 
-use super::util::intrusive;
-
 #[macro_use]
 pub mod nameable;
 pub use self::nameable::Nameable;
@@ -42,7 +40,6 @@ pub trait PackFormat {
 /// A collection of symbols.
 #[derive(Debug)]
 pub struct Pool {
-    refcount: usize,
     map:  BTreeMap<u64,String>
 }
 
@@ -65,7 +62,6 @@ impl Pool {
     }
 }
 
-default_refcounted_impl!(Pool, refcount);
 
 /* ****************************************************************
  * Symbol
