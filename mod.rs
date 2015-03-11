@@ -46,7 +46,7 @@ pub struct Pool {
 impl Pool {
     /// Create a new symbol pool.
     pub fn new() -> Pool {
-        Pool{refcount: 1, map: BTreeMap::new()}
+        Pool{map: BTreeMap::new()}
     }
     /// Fetch a symbol corresponding to the given string.  If if
     pub fn symbol(&mut self, name: &str) -> Symbol {
