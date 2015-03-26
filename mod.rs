@@ -5,6 +5,7 @@
 //! lifetime-unsafe for `Pooled` instances.
 use std;
 use std::fmt;
+use std::convert::AsRef;
 use std::slice::bytes;
 use std::hash::{hash, Hash, Hasher, SipHasher};
 use std::collections::BTreeMap;
@@ -92,8 +93,8 @@ impl Symbol {
 
 }
 
-impl std::str::Str for Symbol {
-    fn as_slice<'t>(&'t self) -> &'t str { unsafe { <Unpacked as PackFormat>::as_slice_from(self) } }
+impl AsRef<str> for Symbol {
+    fn as_ref<'t>(&'t self) -> &'t str { unsafe { <Unpacked as PackFormat>::as_slice_from(self) } }
 }
 
 impl Nameable for Symbol {
@@ -102,14 +103,14 @@ impl Nameable for Symbol {
 
 impl Hash for Symbol {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_slice().hash(state);
+        self.as_ref().hash(state);
     }
 }
 
 
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.as_slice())
+        write!(f, "{}", self.as_ref())
     }
 }
 
@@ -144,9 +145,9 @@ impl Inline {
     }
 }
 
-impl std::str::Str for Inline {
-    fn as_slice<'t>(&'t self) -> &'t str {
-        let src: &[u8] = self.data.as_slice();
+impl AsRef<str> for Inline {
+    fn as_ref<'t>(&'t self) -> &'t str {
+        let src: &[u8] = self.data.as_ref();
         std::str::from_utf8(&src[..(self.len as usize)]).unwrap()
     }
 }
@@ -212,9 +213,9 @@ impl Pooled {
 
 }
 
-impl std::str::Str for Pooled {
-    fn as_slice<'u>(&'u self) -> &'u str {
-        unsafe { (*self.pool).map[self.key].as_slice() }
+impl AsRef<str> for Pooled {
+    fn as_ref<'u>(&'u self) -> &'u str {
+        unsafe { (*self.pool).map[&self.key].as_ref() }
     }
 }
 
@@ -309,11 +310,11 @@ impl PackFormat for Unpacked {
     }
 }
 
-impl std::str::Str for Unpacked {
-    fn as_slice<'t>(&'t self) -> &'t str {
+impl AsRef<str> for Unpacked {
+    fn as_ref<'t>(&'t self) -> &'t str {
         match *self {
-            Unpacked::Inline(ref x) => x.as_slice(),
-            Unpacked::Pooled(ref x) => x.as_slice()
+            Unpacked::Inline(ref x) => x.as_ref(),
+            Unpacked::Pooled(ref x) => x.as_ref()
         }
     }
 }
