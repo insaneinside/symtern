@@ -163,10 +163,10 @@ impl PackFormat for Inline {
             out
         }
     }
-    fn unpack(sym: &Symbol) -> Self {
+    unsafe fn unpack(sym: &Symbol) -> Self {
         let mut out = Inline{len: 0, data: [0; INLINE_SYMBOL_MAX_LEN]};
         let src: &[u8;16] =
-            unsafe { std::mem::transmute(&sym.value) };
+            std::mem::transmute(&sym.value);
 
         panic_unless!(src[0] & TAG_MASK == INLINE, "Invalid tag bit for inlined symbol!");
         out.len = src[0] >> 1;
@@ -178,8 +178,8 @@ impl PackFormat for Inline {
         out
     }
 
-    fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
-        let src: &[u8; 16] = unsafe { std::mem::transmute(&sym.value) };
+    unsafe fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
+        let src: &[u8; 16] = std::mem::transmute(&sym.value);
         panic_unless!(src[0] & TAG_MASK == INLINE, "Invalid tag bit for inlined symbol!");
         let len: usize = (src[0] >> 1) as usize;
         panic_unless!(len <= INLINE_SYMBOL_MAX_LEN,
@@ -226,16 +226,16 @@ impl PackFormat for Pooled {
         val[1] = self.pool as u64;
         Symbol{value: val}
     }
-    fn unpack(sym: &Symbol) -> Self {
+    unsafe fn unpack(sym: &Symbol) -> Self {
         Pooled{key: sym.value[0],
-               pool: unsafe { std::mem::transmute(sym.value[1] as *const Pool) }}
+               pool: std::mem::transmute(sym.value[1] as *const Pool)}
     }
 
-    fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
+    unsafe fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
         panic_unless!(sym.value[0] & TAG_MASK as u64 == POOLED as u64,
                       "Invalid flag bit for pooled symbol");
-        unsafe { std::mem::transmute::<_,&'t Pool>(sym.value[1] as *const Pool) }.
-            map[sym.value[0]].as_slice()
+        std::mem::transmute::<_,&'t Pool>(sym.value[1] as *const Pool).
+            map[&sym.value[0]].as_ref()
     }
 }
 
@@ -295,17 +295,17 @@ impl PackFormat for Unpacked {
         }
     }
 
-    fn unpack(sym: &Symbol) -> Unpacked {
+    unsafe fn unpack(sym: &Symbol) -> Unpacked {
         match sym.type_of() {
-            Type::POOLED => Unpacked::Pooled(unsafe { <Pooled as PackFormat>::unpack(sym) }),
-            Type::INLINE => Unpacked::Inline(unsafe { <Inline as PackFormat>::unpack(sym) }),
+            Type::POOLED => Unpacked::Pooled(<Pooled as PackFormat>::unpack(sym)),
+            Type::INLINE => Unpacked::Inline(<Inline as PackFormat>::unpack(sym)),
         }
     }
 
-    fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
+    unsafe fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
         match sym.type_of() {
-            Type::INLINE => unsafe { <Inline as PackFormat>::as_slice_from(sym) },
-            Type::POOLED => unsafe { <Pooled as PackFormat>::as_slice_from(sym) }
+            Type::INLINE => <Inline as PackFormat>::as_slice_from(sym),
+            Type::POOLED => <Pooled as PackFormat>::as_slice_from(sym)
         }
     }
 }
