@@ -49,7 +49,8 @@ impl Pool {
     pub fn new() -> Pool {
         Pool{map: BTreeMap::new()}
     }
-    /// Fetch a symbol corresponding to the given string.  If if
+
+    /// Fetch a symbol corresponding to the given string.
     pub fn symbol(&mut self, name: &str) -> Symbol {
         if name.len() <= INLINE_SYMBOL_MAX_LEN
         { Inline::new(name).pack() }
@@ -69,7 +70,7 @@ impl Pool {
  */
 /// An atomic `Copy`able string.  Symbol either encodes a short string
 /// directly, or stores it in an external Pool.
-#[derive(Debug)]
+#[derive(Debug,Eq,PartialEq)]
 pub struct Symbol {
     value: [u64; 2]
 }
@@ -114,14 +115,6 @@ impl fmt::Display for Symbol {
     }
 }
 
-impl Eq for Symbol {}
-impl PartialEq<Symbol> for Symbol
-{
-    fn eq(&self, other: &Symbol) -> bool
-    {
-        self.value == other.value
-    }
-}
 
 /* ****************************************************************
  * Inline
@@ -202,6 +195,7 @@ impl std::cmp::PartialEq for Inline {
  * Pooled
  */
 /// Data format for symbols stored as references to a symbol pool.
+#[allow(raw_pointer_derive)]
 #[derive(Debug)]
 pub struct Pooled{key: u64, pool: *const Pool}
 
