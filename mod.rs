@@ -6,10 +6,11 @@
 use std;
 use std::fmt;
 use std::convert::AsRef;
-use std::slice::bytes;
 use std::hash::{hash, Hash, Hasher, SipHasher};
 use std::collections::BTreeMap;
 use std::borrow::ToOwned;
+
+use super::memcpy;
 
 
 #[macro_use]
@@ -70,11 +71,10 @@ impl Pool {
  */
 /// An atomic `Copy`able string.  Symbol either encodes a short string
 /// directly, or stores it in an external Pool.
-#[derive(Debug,Eq,PartialEq)]
+#[derive(Clone,Copy,Debug,Eq,PartialEq)]
 pub struct Symbol {
     value: [u64; 2]
 }
-impl Copy for Symbol {}
 
 impl Symbol {
     /// Convert the symbol to its unpacked representation.
@@ -133,7 +133,7 @@ impl Inline {
                       name.len(), INLINE_SYMBOL_MAX_LEN);
         let mut buf: [u8; INLINE_SYMBOL_MAX_LEN] = [0; INLINE_SYMBOL_MAX_LEN];
 
-        bytes::copy_memory(buf.as_mut_slice(), name.as_bytes());
+        memcpy(&mut buf[..], name.as_bytes());
         Inline{len: name.len() as u8, data: buf}
     }
 }
@@ -152,7 +152,7 @@ impl PackFormat for Inline {
             let mut out = Symbol{ value: [0; 2] };
             let mut dest: &mut [u8; 16] = std::mem::transmute(&mut out.value);
             dest[0] = (self.len << 1) | INLINE;
-            bytes::copy_memory(&mut dest[1..], &self.data);
+            memcpy(&mut dest[1..], &self.data);
             out
         }
     }
@@ -166,7 +166,7 @@ impl PackFormat for Inline {
         panic_unless!(out.len <= INLINE_SYMBOL_MAX_LEN as u8,
                       "Symbol length ({}) exceeds maximum ({}) for inlined symbol",
                       out.len, INLINE_SYMBOL_MAX_LEN);
-        bytes::copy_memory(out.data.as_mut_slice(), &src[1..(out.len as usize + 1)]);
+        memcpy(&mut out.data[..], &src[1..(out.len as usize + 1)]);
 
         out
     }
