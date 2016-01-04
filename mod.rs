@@ -6,7 +6,7 @@
 use std;
 use std::fmt;
 use std::convert::AsRef;
-use std::hash::{hash, Hash, Hasher, SipHasher};
+use std::hash::{Hash, Hasher, SipHasher};
 use std::collections::BTreeMap;
 use std::borrow::ToOwned;
 
@@ -17,6 +17,12 @@ use super::memcpy;
 pub mod nameable;
 pub use self::nameable::Nameable;
 
+
+fn hash<T: Hash>(t: &T) -> u64 {
+    let mut s = SipHasher::new();
+    t.hash(&mut s);
+    s.finish()
+}
 
 /// Methods required of `unpacked` types.
 pub trait PackFormat {
@@ -195,7 +201,6 @@ impl std::cmp::PartialEq for Inline {
  * Pooled
  */
 /// Data format for symbols stored as references to a symbol pool.
-#[allow(raw_pointer_derive)]
 #[derive(Debug)]
 pub struct Pooled{key: u64, pool: *const Pool}
 
