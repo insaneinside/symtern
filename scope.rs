@@ -4,7 +4,6 @@
  * value maps, keyed by Symbols.
  */
 use super::Nameable;
-use super::super::util::intrusive;
 
 /** Trait that defines a method to find the root of a scope hierarchy.
  *
