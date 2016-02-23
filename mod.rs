@@ -11,18 +11,13 @@ use std::collections::BTreeMap;
 use std::borrow::ToOwned;
 
 use super::memcpy;
+use super::util::hash::{stdhash as hash};
 
 
 #[macro_use]
 pub mod nameable;
 pub use self::nameable::Nameable;
 
-
-fn hash<T: Hash>(t: &T) -> u64 {
-    let mut s = SipHasher::new();
-    t.hash(&mut s);
-    s.finish()
-}
 
 /// Methods required of `unpacked` types.
 pub trait PackFormat {
