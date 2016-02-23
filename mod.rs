@@ -125,7 +125,14 @@ impl fmt::Display for Symbol {
 /* ****************************************************************
  * Inline
  */
-const INLINE_SYMBOL_MAX_LEN: usize = 15;//std::mem::size_of::<Symbol>() - 1;
+// We currently get
+//
+//    error: array length constant evaluation error: unimplemented constant expression: calling non-local const fn [E0250]
+//
+// when trying to declare the data array in `struct Inline`, below, if we try to use the obvious expression here.
+//const INLINE_SYMBOL_MAX_LEN: usize = std::mem::size_of::<Symbol>() - 1;
+const INLINE_SYMBOL_MAX_LEN: usize = 15;
+
 
 /// Data format for symbols packed entirely into a `Symbol` instance.
 #[derive(Debug)]
