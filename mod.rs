@@ -10,7 +10,7 @@ use std::hash::{Hash, Hasher, SipHasher};
 use std::collections::BTreeMap;
 use std::borrow::ToOwned;
 
-use super::memcpy;
+use super::util::memcpy;
 use super::util::hash::{stdhash as hash};
 
 
