@@ -142,7 +142,7 @@ impl Inline {
                       name.len(), INLINE_SYMBOL_MAX_LEN);
         let mut buf: [u8; INLINE_SYMBOL_MAX_LEN] = [0; INLINE_SYMBOL_MAX_LEN];
 
-        memcpy(&mut buf[..], name.as_bytes());
+        unsafe { memcpy(&mut buf[..], name.as_bytes()); }
         Inline{len: name.len() as u8, data: buf}
     }
 }
