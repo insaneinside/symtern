@@ -126,6 +126,7 @@ impl fmt::Display for Symbol {
 //
 // when trying to declare the data array in `struct Inline`, below, if we try to use the obvious expression here.
 //const INLINE_SYMBOL_MAX_LEN: usize = std::mem::size_of::<Symbol>() - 1;
+/// Maximum number of bytes in a packed (inline) symbol name.
 const INLINE_SYMBOL_MAX_LEN: usize = 15;
 
 
@@ -256,7 +257,12 @@ const TAG_MASK: u8 = 0x01;
 const POOLED: u8 = 0;
 const INLINE: u8 = 1;
 
-pub enum Type { INLINE = 0, POOLED = 1 }
+/// Storage type for a symbol instance.
+pub enum Type {
+    /// Symbol data packed into the structure itself
+    INLINE = 0,
+    /// Reference to a value in a Pool
+    POOLED = 1 }
 
 impl std::cmp::Eq for Type {}
 impl std::cmp::PartialEq for Type {
