@@ -209,7 +209,7 @@ pub struct Pooled{key: u64, pool: *const Pool}
 
 impl Pooled {
     #[inline(always)]
-    pub fn new(key: u64, pool: *const Pool) -> Self {
+    fn new(key: u64, pool: *const Pool) -> Self {
         Pooled{key: key, pool: pool}
     }
 
