@@ -4,6 +4,7 @@ use std::fmt;
 
 /// Trait for use with objects named by symbols 
 pub trait Nameable {
+    /// Get the symbol corresponding to the object's name.
     fn name(&self) -> Symbol;
 }
 
