@@ -5,11 +5,13 @@
 //! lifetime-unsafe for `Pooled` instances.
 use std;
 use std::fmt;
+use std::mem;
 use std::convert::AsRef;
 use std::marker::PhantomData;
 use std::hash::{Hash, Hasher, SipHasher};
 use std::collections::BTreeMap;
 use std::borrow::ToOwned;
+use std::sync::Mutex;
 
 use super::util::memcpy;
 use super::util::hash::{stdhash as hash};
@@ -24,19 +26,27 @@ pub use self::nameable::Nameable;
  * Pool
  */
 /// A collection of symbols.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Pool {
-    map:  BTreeMap<u64,String>
+    map:  Mutex<BTreeMap<u64,String>>
 }
+
+impl Clone for Pool {
+    fn clone(&self) -> Self {
+        let m = self.map.lock().expect("Failed to lock symbol pool mutex for clone");
+        Pool{map: Mutex::new(m.clone())}
+    }
+}
+
 
 impl Pool {
     /// Create a new symbol pool.
     pub fn new() -> Pool {
-        Pool{map: BTreeMap::new()}
+        Pool{map: Mutex::new(BTreeMap::new())}
     }
 
     /// Fetch a symbol corresponding to the given string.
-    pub fn sym<'a>(&'a mut self, name: &str) -> Sym<'a> {
+    pub fn sym<'a>(&'a self, name: &str) -> Sym<'a> {
         Sym(unsafe { self.symbol(name) }, PhantomData)
     }
 
@@ -44,12 +54,13 @@ impl Pool {
     ///
     /// Care must be taken to ensure that the returned symbol is not used after
     /// the pool goes out of scope.
-    pub unsafe fn symbol(&mut self, name: &str) -> Symbol {
+    pub unsafe fn symbol(&self, name: &str) -> Symbol {
         if name.len() <= INLINE_SYMBOL_MAX_LEN
         { Inline::new(name).pack() }
         else { let hsh = hash::<_, SipHasher>(&name) << 1;
-               if ! self.map.contains_key(&hsh) {
-                   self.map.insert(hsh, name.to_owned());
+               let mut map = self.map.lock().expect("Failed to lock symbol pool mutex for insertion");
+               if ! map.contains_key(&hsh) {
+                   map.insert(hsh, name.to_owned());
                }
 
                Pooled::new(hsh, self).pack()
@@ -251,7 +262,7 @@ impl PackFormat for Inline {
     fn pack(&self) -> Symbol {
         unsafe {
             let mut out = Symbol{ value: [0; 2] };
-            let mut dest: &mut [u8; 16] = std::mem::transmute(&mut out.value);
+            let mut dest: &mut [u8; 16] = mem::transmute(&mut out.value);
             dest[0] = (self.len << 1) | INLINE;
             memcpy(&mut dest[1..], &self.data);
             out
@@ -260,7 +271,7 @@ impl PackFormat for Inline {
     unsafe fn unpack(sym: &Symbol) -> Self {
         let mut out = Inline{len: 0, data: [0; INLINE_SYMBOL_MAX_LEN]};
         let src: &[u8;16] =
-            std::mem::transmute(&sym.value);
+            mem::transmute(&sym.value);
 
         panic_unless!(src[0] & TAG_MASK == INLINE, "Invalid tag bit for inlined symbol!");
         out.len = src[0] >> 1;
@@ -273,7 +284,7 @@ impl PackFormat for Inline {
     }
 
     unsafe fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
-        let src: &[u8; 16] = std::mem::transmute(&sym.value);
+        let src: &[u8; 16] = mem::transmute(&sym.value);
         panic_unless!(src[0] & TAG_MASK == INLINE, "Invalid tag bit for inlined symbol!");
         let len: usize = (src[0] >> 1) as usize;
         panic_unless!(len <= INLINE_SYMBOL_MAX_LEN,
@@ -300,8 +311,12 @@ impl Pooled {
 }
 
 impl AsRef<str> for Pooled {
-    fn as_ref<'u>(&'u self) -> &'u str {
-        unsafe { (*self.pool).map[&self.key].as_ref() }
+    fn as_ref<'t>(&'t self) -> &'t str {
+        unsafe {
+            mem::transmute((*self.pool).map.lock()
+                           .expect("Failed to lock symbol pool mutex for lookup")
+                           [&self.key].as_str())
+        }
     }
 }
 
@@ -314,14 +329,15 @@ impl PackFormat for Pooled {
     }
     unsafe fn unpack(sym: &Symbol) -> Self {
         Pooled{key: sym.value[0],
-               pool: std::mem::transmute(sym.value[1] as *const Pool)}
+               pool: mem::transmute(sym.value[1] as *const Pool)}
     }
 
     unsafe fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
         panic_unless!(sym.value[0] & TAG_MASK as u64 == POOLED as u64,
                       "Invalid flag bit for pooled symbol");
-        std::mem::transmute::<_,&'t Pool>(sym.value[1] as *const Pool).
-            map[&sym.value[0]].as_ref()
+        mem::transmute(mem::transmute::<_,&'t Pool>(sym.value[1] as *const Pool)
+                       .map.lock().expect("Failed to lock symbol pool mutex for lookup")
+                       [&sym.value[0]].as_str())
     }
 }
 
