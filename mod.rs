@@ -84,7 +84,7 @@ impl Pool {
 
     /// Fetch a symbol corresponding to the given string.
     #[inline(always)]
-    pub fn sym<'a>(&'a self, name: &str) -> Sym<'a> {
+    pub fn sym<'a, S: AsRef<str>>(&'a self, name: S) -> Sym<'a> {
         Sym(unsafe { self.symbol(name) }, PhantomData)
     }
 
@@ -95,7 +95,8 @@ impl Pool {
     ///
     /// This method should remain private, and shouldn't be used unless you're
     /// absolutely certain it's what you want.
-    unsafe fn symbol(&self, name: &str) -> private::Symbol {
+    unsafe fn symbol<S: AsRef<str>>(&self, name: S) -> private::Symbol {
+        let name = name.as_ref();
         if name.len() <= private::INLINE_SYMBOL_MAX_LEN {
             private::Inline::new(name).pack()
         } else {
