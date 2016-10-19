@@ -115,4 +115,6 @@ submit a pull request for review.
 
 ## License
 
-Symtern is dual-licensed 
+Symtern is dual-licensed under either the
+[Apache License version 2.0](LICENSE-Apache2.0) or the
+[MIT License](LICENSE-MIT).
