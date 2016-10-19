@@ -1,0 +1,312 @@
+#!/usr/bin/env ruby
+# -*- coding: utf-8 -*-
+
+# Sync examples between the project's "examples" directory and
+# documentation targets.
+
+require 'tomlrb'
+
+CRATE_NAME = Tomlrb.parse(File.read('Cargo.toml'), symbolize_keys: true)[:package][:name]
+PREFIXES = { '.rs' => %r{\s*//[!/] ?},
+             '.md' => %r{} }
+
+module R
+  @group_name = '_g0'
+  def self.gn()
+    @group_name.succ!
+  end
+  class Escaped < String
+  end
+  def self.escape(s)
+    if s.kind_of?(Escaped)
+      s
+    elsif s.kind_of?(String)
+      Escaped.new(Regexp.escape(s))
+    else
+      s
+    end
+  end
+    
+  def self.list(sep, pat)
+    sep = escape(sep)
+    
+    pat1, pat2 = pat.respond_to?(:call) \
+      ? [pat.call(), pat.call()] \
+      : [pat, pat]
+      
+    /#{pat1}(?:\s*#{sep}\s*#{pat2})*/m
+  end
+  IDENT = /[_a-zA-Z][_a-zA-Z0-9]*/
+  TAG_NAME = /[-a-zA-Z][-.a-zA-Z0-9]*/
+  EXTERN_CRATE = /extern\s+crate\s+(?<crate>#{IDENT})(?:\s+as\s+(?<alias>#{IDENT}))?\s*;/m
+  def self.tag(name = TAG_NAME)
+    name = escape(name)
+    %r{//`\s*id\s*=\s*#{name}\s*\n|/\*`\s*id\s*=\s*#{name}\s*\*/}
+  end
+  TAG = tag()
+  BLOCK = /(?<block>\{(?:[^\{\}]|\g<block>)*\})/m
+  def self.tagged_block(name = TAG_NAME)
+    /#{tag(name)}\s*#{BLOCK}/m
+  end
+  TAGGED_BLOCK = tagged_block()
+  def self.balanced(s, name)
+    a, b = [Regexp.escape(s[0]), Regexp.escape(s[1])]
+    /(?<#{name}>#{a}(?:[^#{a}#{b}]|\g<#{name}>)*#{b})/m
+  end
+
+  def self.generics(name)
+    self.balanced('<>', name)
+  end
+
+  def self.path()
+    /(?:[!?]\s*)?#{list('::', lambda { || /#{IDENT}|#{generics(gn())}|#{IDENT}\s*#{generics(gn())}/ })}/
+  end
+
+  def self.ident_or_path()
+    /'#{IDENT}|#{path()}/
+  end
+  def self.bounds_clause(); /#{ident_or_path()}\s*:\s*#{list('+', lambda { || ident_or_path() })}/m; end
+  def self.where_clause(); /where\s+#{list(',', lambda { || bounds_clause()})}/m; end
+  IMPL = /impl#{generics(gn())}?\s+#{path()}(?:\s+for\s+#{path()})?(?:\s+#{where_clause})?\s*#{BLOCK}/m
+  def self.fn(name = IDENT)
+    name = escape(name)
+    /(?:pub\s+)?fn\s+(?<fn_name>#{name})(?:\s*#{generics(gn())})?\s*#{balanced('()', 'arguments')}(?:\s*#{where_clause})?\s*#{BLOCK}/m
+  end
+  FN = self.fn()
+  META = /\#!?#{balanced('[]', gn())}/m
+  STRUCT_OR_ENUM = /(?:pub\s+)?(?:struct|enum)\s+#{IDENT}(?:\s*#{generics(gn())})?(?:\s*#{where_clause})?\s*#{BLOCK}/
+  NEWTYPE = /(?:pub\s+)?struct\s+#{IDENT}(?:\s*#{generics(gn())})?\s*#{balanced('()', gn())}(?:\s*#{where_clause})?\s*;/
+  TYPE_ALIAS = /(?:pub\s+)?(?:type)\s+#{IDENT}\s*=\s*#{path()}\s*;/m
+
+  BLOCK_COMMENT_CONTENTS = %r{[^*/]|\*(?!/)|(?<!\*)/}
+  LINE_COMMENT_CONTENTS = /[^\n]/
+
+  def self.block_comment(contents = nil)
+    if contents.nil?
+      name = gn()
+      %r{(?<#{name}>/\*(?:#{BLOCK_COMMENT_CONTENTS}|\g<#{name}>)*\*/)}m
+    else
+      contents = escape(contents)
+      %r{/\*#{contents}\*/}
+    end
+  end
+  def self.line_comment(contents = nil)
+    if contents.nil?
+      contents = /#{LINE_COMMENT_CONTENTS}*/
+    else
+      contents = escape(contents)
+    end
+    %r{//#{contents}\n}
+  end
+
+  def self.comment(contents = nil)
+    /#{block_comment(contents)}|#{line_comment(contents)}/
+  end
+    
+  COMMENT = /#{block_comment()}|#{line_comment()}/
+  INNER_LINE_COMMENT = line_comment(/!#{LINE_COMMENT_CONTENTS}*/)
+  INNER_BLOCK_COMMENT = block_comment(%r{!#{BLOCK_COMMENT_CONTENTS}*})
+  INNER_COMMENT = /#{INNER_BLOCK_COMMENT}|#{INNER_LINE_COMMENT}/
+  ELLIPSIS_COMMENT = comment(/\s*...\s*/)
+
+  def self.anchored(re); /\A#{re}/; end
+
+  def self.all_matches(re, s, ofs = 0)
+    o = []
+    while ofs < s.length && ! (m = re.match(s, ofs)).nil?
+      o << m
+      ofs = m.end(0)
+    end
+    o
+  end
+end
+
+
+# Given the `block` submatch from a BLOCK_REGEXP match, return the part inside
+# the outermost pair of braces with extraneous indentation removed.
+def extract_block_contents(s)
+  # Remove the enclosing braces and strip the common-prefix indent (on
+  # non-blank lines) after normalizing tabs as spaces.
+  lines = s[1...-1].lines().map { |l| l.tr("\t", ' ' * 8) }
+  strip_regexp = Regexp.new('\A[ ]{0,%u}' % lines.select { |l| l =~ /[^\n ]/ }.map { |l| l =~ /[^ ]/ }.min)
+  lines.map { |l| l.sub(strip_regexp, '') }.join('').strip()
+end
+
+# Retrieve a code sample from a file, transforming it appropriately for an
+# idiomatic Rust code sample.  If `id` is non-`nil`, searches for and includes
+# only the named block (as tagged with a comment "//` id=#{id}" or
+# "/*` id=#{id}*/").
+def fetch_code(attrs)
+  input = File.read(attrs[:file])
+  output = input.dup
+  extern_crates = R.all_matches(R::EXTERN_CRATE, input)
+
+  can_open_code_main = false
+
+  # If there's only a single `extern crate` declaration, and it's the local
+  # project and has not been aliased, expunge it.
+  if extern_crates.length == 1 && (c = extern_crates.first)[:crate] == CRATE_NAME && c[:alias].nil?
+    output.sub!(/#{Regexp.escape(c[0])}\s*\n/, '')
+    can_open_code_main = true
+  end
+
+  # Strip various things
+  if attrs.key?(:strip)
+    for item in attrs[:strip].split(',')
+      case item
+      when 'inner-comments'
+        output.gsub!(R::INNER_COMMENT, '')
+      else
+        raise "Unknown strip item: #{item}"
+      end
+    end
+  end
+  # Remove everything that follows an ellipsis comment inside a block
+  ofs = 0
+  while ! (m = R::ELLIPSIS_COMMENT.match(output, ofs)).nil?
+    strip_begin = m.end(0)
+    ofs = strip_begin
+    # Find the containing block
+    block_start = output.rindex('{', m.begin(0))
+    next if block_start.nil?
+    next if (m = R::BLOCK.match(output, block_start)).nil?
+    # Preserve whitespcace before the closing brace
+    block_inner_end = m.begin(0) + /\s*}\z/m.match(m[0]).begin(0) + 1
+    output.slice!(strip_begin...block_inner_end)
+  end
+
+  main_fn = R.fn('main').match(input)
+
+
+  if attrs.key?(:id)
+    # If a tagged block was requested, fetch it from `main`
+    if (m = R::tagged_block(attrs[:id]).match(main_fn[:block])).nil?
+      $stderr.puts("No such tagged block \"#{id}\" in #{file}")
+      output
+    else
+      output.sub(main_fn[0], extract_block_contents(m[:block])).strip
+    end
+  elsif can_open_code_main
+    output.sub(main_fn[0], extract_block_contents(main_fn[:block]))
+  else
+    output
+  end
+end
+
+class TextChunk < String
+end
+class CodeChunk
+  attr_reader :content
+  attr_reader :attributes
+  def initialize(content:, file:, line:,
+                 open_fence:, close_fence:,
+                 prefix: '',
+                 attributes: {})
+    @file = file
+    @line = line
+    @content = content
+    @attributes = attributes
+    @open_fence = open_fence
+    @close_fence = close_fence
+    @prefix = prefix
+  end
+  def attributes_to_s
+    '%s %s' % [@attributes[:language],
+               @attributes.reject { |k,_| k == :language }.map  { |k, v| '%s=%s' % [k.to_s, v.to_s] }.join(' ')]
+  end
+  def to_s
+    code =
+      if @attributes.key?(:file)
+        fetch_code(@attributes) \
+          || raise("Failed to load external code chunk for #{self.inspect}")
+      else
+        if @attributes.key?(:id)
+          $stderr.puts("WARNING: no source file specified for fenced code block \"#{@attributes[:id]}\" at #{@file}:#{@line}")
+        end
+        @content
+      end
+    "#{@open_fence}#{attributes_to_s()}\n#{code.strip}\n#{@close_fence}\n\n".gsub(/^/, @prefix)
+  end
+  def inspect
+    '#<%s:%#x %s:%u %s>' % [self.class, self.object_id, @file, @line,  @attributes.map { |k, v| '%s=%s' % [k.to_s, v.inspect] }.join(' ')]
+  end
+end
+
+# Divide a string containing Markdown syntax into a series of alternating
+# TextChunk and CodeChunk instances
+#
+# @param [String] input Markdown input string.
+def chunk(filename, prefix = //)
+  input = File.read(filename)
+  chunks = []
+  line = 0
+
+  while ! input.empty?
+    pre, sep, post = input.partition(/^(?<prefix>#{prefix})(?<open_fence>(?<indent>[ ]{0,3})(?<fence>`{3,}|~{3,}))\s*(?<info_string>[^\n]*)\n/)
+    unless pre.empty?
+      chunks << TextChunk.new(pre) 
+      line += pre.count("\n")
+    end
+    line += sep.count("\n")
+
+    if ! (m = Regexp.last_match).nil?
+      indent = m[:indent]
+      fence = m[:fence]
+      open_fence = m[:open_fence]
+      info_string = m[:info_string].strip
+      open_prefix = m[:prefix]
+
+      # Closing fence uses the same character as the opening fence, and must
+      # be at least the same number of characters.  It may not be followed by
+      # anything but spaces on the same line, but may be indented up to three
+      # spaces regardless of the indent on the opening fence.
+      body, sep, post = post.partition(/^(?<prefix>#{prefix})(?<close_fence>[ ]{0,3}#{fence}#{fence[0]}*)\s*\n/)
+      code_line = line
+      line += body.count("\n") + sep.count("\n")
+
+      close_fence = Regexp.last_match[:close_fence]
+      close_prefix = Regexp.last_match[:prefix]
+      attrs_ary = info_string.split()
+      attrs = {}
+      attrs[:language] = attrs_ary.shift
+      attrs_ary.map { |s| s.split('=') }.each { |x| attrs[x.first.tr('-', '_').intern] = x.last }
+
+      unindent_regexp = Regexp.new('^[ ]{0,%u}' % indent.length)
+      body.gsub!(unindent_regexp, '')
+
+      # If the line prefixes differ, we've probably parsed
+      # something incorrectly.
+      prefix = if open_prefix != close_prefix
+                 raise 'Prefix mismatch:  open fence had prefix %s, close fence had prefix %s' % [open_prefix, close_prefix]
+               else
+                 open_prefix
+               end
+
+      chunks << CodeChunk.new(content: body, file: filename, line: code_line,
+                              open_fence: open_fence, close_fence: close_fence,
+                              prefix: prefix,
+                              attributes: attrs)
+    end
+    input = post
+  end
+  Chunks.new(chunks)
+end
+
+class Chunks < Array
+  def to_s
+    self.collect { |c| c.to_s }.join('')
+  end
+end
+
+def transform_file(fname, io = $stdout)
+  io.write(chunk(fname, PREFIXES[File.extname(fname)]).to_s)
+end
+
+if caller[0].nil?
+  INPUT = 'README.md'
+  chunks = chunk(INPUT)
+  #File.rename(INPUT, INPUT + '.bak')
+
+  io = $stdout #File.open(INPUT, 'w')
+  io.write(file.to_s)
+end

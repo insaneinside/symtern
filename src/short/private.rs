@@ -117,13 +117,15 @@ unsafe fn memcpy_nonoverlapping(dest: &mut [u8], src: &[u8]) {
 pub struct Inline{len: u8, data: [u8; INLINE_SYMBOL_MAX_LEN]}
 
 impl Inline {
-    /// Create a new Inline-format symbol using the given string.
+    /// Create a new Inline-format symbol using the given string; panics if the
+    /// string exceeds INLINE_SYMBOL_MAX_LEN.
     pub fn new(name: &str) -> Self {
         let name_bytes = name.as_bytes();
         let name_bytes_len = name_bytes.len();
-        panic_unless!(name_bytes_len <= INLINE_SYMBOL_MAX_LEN,
-                      "Argument to Inline::new ({} bytes) exceeds maximum length ({}) for an inlined symbol",
-                      name_bytes_len, INLINE_SYMBOL_MAX_LEN);
+        if name_bytes_len > INLINE_SYMBOL_MAX_LEN {
+            panic!("Argument to Inline::new ({} bytes) exceeds maximum length ({}) for an inlined symbol",
+                   name_bytes_len, INLINE_SYMBOL_MAX_LEN);
+        }
         let mut buf: [u8; INLINE_SYMBOL_MAX_LEN] = [0; INLINE_SYMBOL_MAX_LEN];
 
         unsafe {
@@ -157,11 +159,13 @@ impl PackFormat for Inline {
         let src: &[u8;16] =
             mem::transmute(&sym.value);
 
-        panic_unless!(src[0] & TAG_MASK == INLINE, "Invalid tag bit for inlined symbol!");
+        if src[0] & TAG_MASK != INLINE { panic!("Invalid tag bit for inlined symbol!"); }
         out.len = src[0] >> 1;
-        panic_unless!(out.len <= INLINE_SYMBOL_MAX_LEN as u8,
-                      "Symbol length ({}) exceeds maximum ({}) for inlined symbol",
-                      out.len, INLINE_SYMBOL_MAX_LEN);
+        if out.len > INLINE_SYMBOL_MAX_LEN as u8 {
+            panic!( "Symbol length ({}) exceeds maximum ({}) for inlined symbol",
+                     out.len, INLINE_SYMBOL_MAX_LEN);
+        }
+
         memcpy_nonoverlapping(&mut out.data[..], &src[1..(out.len as usize + 1)]);
 
         out
@@ -169,11 +173,12 @@ impl PackFormat for Inline {
 
     unsafe fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
         let src: &[u8; 16] = mem::transmute(&sym.value);
-        panic_unless!(src[0] & TAG_MASK == INLINE, "Invalid tag bit for inlined symbol!");
+        if src[0] & TAG_MASK != INLINE { panic!("Invalid tag bit for inlined symbol!"); }
         let len: usize = (src[0] >> 1) as usize;
-        panic_unless!(len <= INLINE_SYMBOL_MAX_LEN,
-                      "Symbol length ({}) exceeds maximum ({}) for inlined symbol",
-                      len, INLINE_SYMBOL_MAX_LEN);
+        if len as u8 > INLINE_SYMBOL_MAX_LEN as u8 {
+            panic!("Symbol length ({}) exceeds maximum ({}) for inlined symbol",
+                   len, INLINE_SYMBOL_MAX_LEN);
+        }
 
         std::str::from_utf8(&src[1..(len + 1)]).unwrap()
     }
@@ -218,8 +223,7 @@ impl PackFormat for Pooled {
     }
 
     unsafe fn as_slice_from<'t>(sym: &'t Symbol) -> &'t str {
-        panic_unless!(sym.value[0] & TAG_MASK as u64 == POOLED as u64,
-                      "Invalid flag bit for pooled symbol");
+        if sym.value[0] & TAG_MASK as u64 != POOLED as u64 { panic!("Invalid flag bit for pooled symbol"); }
         mem::transmute(mem::transmute::<_,&'t Pool>(sym.value[1] as *const Pool)
                        .map.lock().expect("Failed to lock symbol pool mutex for lookup")
                        [&sym.value[0]].as_str())

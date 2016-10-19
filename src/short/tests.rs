@@ -36,11 +36,12 @@ fn inline_pack_unpack() {
     println!("{:?}", bar);
 
 
-    panic_unless!(foo == foo, "each symbol::Inline instance should be equal to itself");
-    panic_unless!(bar == bar, "each symbol::Symbol instance should be equal to itself");
+    if foo != foo { panic!("each symbol::Inline instance should be equal to itself"); }
+    if bar != bar { panic!("each symbol::Symbol instance should be equal to itself"); }
 
-    panic_unless!(Unpacked::Inline(foo) == bar.unpack(),
-                  "pack-unpack cycle on a symbol::Inline should yield the same symbol");
+    if Unpacked::Inline(foo) != bar.unpack() {
+        panic!("pack-unpack cycle on a symbol::Inline should yield the same symbol");
+    }
 }
 
 
@@ -60,7 +61,9 @@ fn pooled_pack_unpack() {
     println!("{:?}", a.unpack());
 
     assert_eq!(a, a);
-    panic_unless!(a != b && b != a, "`a` and `b` are distinct symbols and should not be equal");
+    if a == b || b == a {
+        panic!("`a` and `b` are distinct symbols and should not be equal");
+    }
     assert_eq!(a.as_ref(), a_str);
     assert_eq!(b.as_ref(), b_str);
 }
