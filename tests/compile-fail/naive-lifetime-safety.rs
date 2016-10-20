@@ -11,10 +11,11 @@ struct Sym<'a> {
 impl MyInterner {
     fn new() -> Self {
         // ...
-        MyInterner{map: HashMap::new(), id_to_string: Vec::new()}
+        MyInterner{map: ::std::collections::HashMap::new(), id_to_string: Vec::new()}
     }
     fn intern<'a>(&'a mut self, s: &str) -> Sym<'a> {
         // ...
+        use ::std::marker::PhantomData;
         if self.map.contains_key(s) { Sym{marker: PhantomData, id: *self.map.get(s).unwrap()} }
         else {
             self.id_to_string.push(s.to_owned());
