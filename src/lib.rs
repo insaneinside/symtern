@@ -12,7 +12,7 @@
 //!
 //!
 //! Each of these modules defines a `Pool` type that implements
-//! [`traits::Interner`]
+//! [`traits::Interner`].
 //!
 //! # Examples
 //!
