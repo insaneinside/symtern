@@ -97,15 +97,8 @@ match p2.resolve(p1.intern("Batman").unwrap()) {
 ## API Stability
 
 This library's API has not yet been stabilized; specifically, there are
-compromises to be considered with respect to safety and complexity:
-
-  * Should we require interners to outlive the symbols they produce?  This can
-    be accomplished using interior mutability (the interner implemented in the
-    library's `short` module does this), but doing so complicates
-    the implementation.
-
-  * Is it desirable to support 
-
+compromises to be considered with respect to safety and complexity.  Some of
+these issues are discussed in [src/traits.rs](src/traits.rs).
 
 ## Contributing
 
