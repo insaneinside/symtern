@@ -35,18 +35,6 @@
 //! }
 //! ```
 //!
-//! Symbols are also lifetime-safe: they cannot outlive their parent interners.
-//!
-//! ```rust,compile_fail
-//! extern crate symtern;
-//! use symtern::short::Pool;
-//!
-//! fn main() {
-//!     let sym = { let pool = Pool::new(); //~ ERROR `pool` does not live long enough
-//!                 pool.intern("xyz") };
-//! }
-//! ```
-//!
 //! [`traits::Interner`]: traits/trait.Interner.html
 //! [`basic`]: basic/index.html
 //! [`short`]: short/index.html
