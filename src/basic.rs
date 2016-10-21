@@ -9,46 +9,11 @@
 //! `Eq`, and `Hash`, where its owned type (`ToOwned::Owned`) also implements
 //! `Eq` and `Hash`.
 
-use std::rc;
-use std::ops::Deref;
 use std::hash::{Hash, Hasher};
 use std::borrow::{Borrow, ToOwned};
 
 use traits::{InternerMut, SymbolId, Resolver, UnsafeResolver};
 use {Result, ErrorKind};
-
-
-/// `std::rc::Rc` wrapper with some `std::borrow::Borrow` specializations to
-/// allow better ergonomics.
-#[derive(Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
-pub struct Rc<T: ?Sized>(rc::Rc<T>);
-
-impl<T> Clone for Rc<T>
-    where rc::Rc<T>: Clone
-{
-    fn clone(&self) -> Self {
-        Rc(self.0.clone())
-    }
-}
-
-impl Borrow<str> for Rc<String> {
-    fn borrow(&self) -> &str {
-        Borrow::<String>::borrow(&self.0).borrow()
-    }
-}
-
-impl<T> Borrow<T> for Rc<T> {
-    fn borrow(&self) -> &T {
-        self.0.borrow()
-    }
-}
-
-impl<T> Deref for Rc<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        self.0.deref()
-    }
-}
 
 /// Symbol type used by [the `shash` module](index.html)'s
 /// [`Interner`](../traits/trait.Interner.html) implementation.
@@ -73,7 +38,7 @@ pub struct Pool<T: ?Sized, I = usize>
           I: SymbolId
 {
     ids_map: HashMap<u64, I>,
-    lookup_vec: Vec<Rc<T::Owned>>
+    lookup_vec: Vec<T::Owned>
 }
 
 // (inherent impl)
@@ -122,7 +87,6 @@ impl<T: ?Sized, I> InternerMut<T> for Pool<T, I>
     where I: SymbolId,
           T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash + Borrow<T>,
-          Rc<T::Owned>: Borrow<T>,
 {
     type Symbol = Sym<I>;
     fn intern(&mut self, value: &T) -> Result<Self::Symbol> {
@@ -132,7 +96,6 @@ impl<T: ?Sized, I> InternerMut<T> for Pool<T, I>
         } else if self.is_full() {
             return Err(ErrorKind::PoolOverflow.into())
         } else {
-           //let rc = Rc(value.to_owned().into());
             self.lookup_vec.push(value.to_owned());
 
             // We do not expect this conversion to fail, since the condition in
@@ -151,8 +114,7 @@ impl<T: ?Sized, I> InternerMut<T> for Pool<T, I>
 // Resolver
 impl<T: ?Sized, I> Resolver<T> for Pool<T, I>
     where T: ToOwned + Eq + Hash,
-          Rc<T::Owned>: Borrow<T>,
-          T::Owned: Eq + Hash,
+          T::Owned: Eq + Hash + Borrow<T>,
           I: SymbolId
 {
     type Stored = T;
