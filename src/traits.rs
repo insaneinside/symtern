@@ -143,16 +143,17 @@ pub trait ResolveUnchecked<S: Symbol>: Resolve<S> {
     unsafe fn resolve_unchecked(&self, symbol: S) -> &Self::Target;
 }
 
-/// Trait for implementation by symbol types that handle symbol
-/// resolution themselves.
-pub trait SelfResolver: Symbol {
-    /// Type stored by the interner and made available with `resolve`.
-    /// This type should usually be the same as the parent interner's
-    /// type parameter.
-    type Stored: ?Sized;
 
-    /// Look up and return a reference to the value represented by this symbol.
-    /// Self-resolving symbols are expected to always be valid, hence this
-    /// method _must not_ fail.
-    fn resolve(&self) -> &Self::Stored;
+
+/// Trait implemented by interners that require a reference to a symbol in
+/// order to resolve it.
+pub trait ResolveRef<S> where S: Symbol {
+    /// Type stored by the interner and made available with `resolve_ref`.
+    type Target: ?Sized;
+
+    /// Look up and return a reference to the value represented by a symbol, or
+    /// an error if the symbol was not found.
+    fn resolve_ref<'a, 'b, 'c>(&'a self, symbol: &'b S) -> Result<&'c Self::Target>
+        where 'a: 'c,
+              'b: 'c;
 }
