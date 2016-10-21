@@ -125,22 +125,22 @@ pub trait InternerMut<T: ?Sized> {
 
 /// Trait for implementation by interners that directly provide
 /// symbol resolution.
-// FIXME: [design] Should Resolver instead use a supertrait that can be
-// satisfied by either Interner -or- InternerMut?
-pub trait Resolver<T: ?Sized>: InternerMut<T> {
+pub trait Resolve<S: Symbol> {
     /// Type stored by the interner and made available with `resolve`.
-    /// This type should usually be the same as `T`.
-    type Stored: ?Sized;
+    type Target: ?Sized;
 
-    /// Look up and return a reference to the value represented by a symbol.
-    fn resolve(&self, symbol: Self::Symbol) -> Result<&Self::Stored>;
+    /// Look up and return a reference to the value represented by a symbol, or
+    /// an error if the symbol was not found.
+    fn resolve(&self, symbol: S) -> Result<&Self::Target>;
 }
 
 
 /// Interface for resolvers that can provide faster symbol resolution at the
 /// expense of guaranteed safety.
-pub trait UnsafeResolver<T: ?Sized>: Resolver<T> {
-    unsafe fn resolve_unchecked(&self, symbol: Self::Symbol) -> &Self::Stored;
+pub trait ResolveUnchecked<S: Symbol>: Resolve<S> {
+    /// Resolve the given symbol into its referent, bypassing any
+    /// validity checks.
+    unsafe fn resolve_unchecked(&self, symbol: S) -> &Self::Target;
 }
 
 /// Trait for implementation by symbol types that handle symbol
