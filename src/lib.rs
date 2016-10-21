@@ -44,6 +44,8 @@ extern crate num_traits;
 
 use std::fmt;
 
+#[macro_use] mod sym;
+mod core;
 pub mod traits;
 pub mod short;
 pub mod basic;

@@ -9,17 +9,16 @@
 //! `Eq`, and `Hash`, where its owned type (`ToOwned::Owned`) also implements
 //! `Eq` and `Hash`.
 
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::borrow::{Borrow, ToOwned};
 
-use traits::{InternerMut, SymbolId, Resolver, UnsafeResolver};
-use {Result, ErrorKind};
+use traits::{InternerMut, SymbolId, Resolve, ResolveUnchecked};
+use {core, sym, Result, ErrorKind};
+use sym::Symbol;
 
-/// Symbol type used by [the `shash` module](index.html)'s
-/// [`Interner`](../traits/trait.Interner.html) implementation.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Sym<I> {
-    id: I
+make_sym! {
+    pub Sym<I>:
+    "Symbol type used by [the `basic` module](index.html)'s [`InternerMut`](../traits/trait.InternerMut.html) implementation.";
 }
 
 #[cfg(feature = "fnv")]
@@ -52,12 +51,17 @@ impl<T: ?Sized, I> Pool<T, I>
         Default::default()
     }
 
+    /// Get the number of entries contained in the pool.
+    pub fn len(&self) -> usize {
+        self.lookup_vec.len()
+    }
+
     /// Check if the number of interned symbols has reached the maximum allowed
     /// for the pool's ID type.
     pub fn is_full(&self) -> bool {
         // Symbol IDs range from 0 to M, where M is given by `I::max_value()`;
         // hence a pool containing N entries is full iff N == M + 1.
-        let len = self.lookup_vec.len();
+        let len = self.len();
         len >= 1 && len - 1 >= I::max_value().to_usize().expect("Unexpected failure to convert index type `max_value()` result to usize")
     }
 }
@@ -74,14 +78,6 @@ impl<T: ?Sized, I> Default for Pool<T, I>
     }
 }
 
-
-/// Hash an object using the given hasher type.
-fn hash<H: Hasher + Default, T: Hash>(obj: &T) -> u64 {
-    let mut hasher = H::default();
-    obj.hash(&mut hasher);
-    hasher.finish()
-}
-
 // InternerMut
 impl<T: ?Sized, I> InternerMut<T> for Pool<T, I>
     where I: SymbolId,
@@ -90,9 +86,9 @@ impl<T: ?Sized, I> InternerMut<T> for Pool<T, I>
 {
     type Symbol = Sym<I>;
     fn intern(&mut self, value: &T) -> Result<Self::Symbol> {
-        let h = hash::<::fnv::FnvHasher,_>(value);
-       if let Some(&id) = self.ids_map.get(h) {
-            return Ok(Sym{id: id/*, marker: PhantomData*/});
+        let key = core::hash::<T, core::DefaultHashAlgo>(value);
+        if let Some(&id) = self.ids_map.get(&key) {
+            return Ok(sym::create(id))
         } else if self.is_full() {
             return Err(ErrorKind::PoolOverflow.into())
         } else {
@@ -103,24 +99,24 @@ impl<T: ?Sized, I> InternerMut<T> for Pool<T, I>
             // a representable value.
             let id = I::from_usize(self.lookup_vec.len() - 1)
                 .expect("Unexpected failure to convert symbol ID from usize");
-            self.ids_map.insert(h, id);
+            self.ids_map.insert(key, id);
 
-            Ok(Sym{id: id})
+            Ok(sym::create(id))
         }
     }
 }
 
 // ----------------------------------------------------------------
-// Resolver
-impl<T: ?Sized, I> Resolver<T> for Pool<T, I>
+// Resolve
+impl<T: ?Sized, I> Resolve<Sym<I>> for Pool<T, I>
     where T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash + Borrow<T>,
           I: SymbolId
 {
-    type Stored = T;
-    fn resolve(&self, sym: Self::Symbol) -> Result<&Self::Stored> {
+    type Target = T;
+    fn resolve(&self, s: <Self as InternerMut<T>>::Symbol) -> Result<&Self::Target> {
         // We previously converted the ID _from_ a usize, so this conversion should _not_ fail.
-        let idx = sym.id.to_usize().expect("Unexpected failure to convert symbol ID to usize");
+        let idx = s.id().to_usize().expect("Unexpected failure to convert symbol ID to usize");
 
         if self.lookup_vec.len() > idx {
             Ok(self.lookup_vec[idx].borrow())
@@ -129,14 +125,13 @@ impl<T: ?Sized, I> Resolver<T> for Pool<T, I>
         }
     }
 }
-impl<T: ?Sized, I> UnsafeResolver<T> for Pool<T, I>
+impl<T: ?Sized, I> ResolveUnchecked<Sym<I>> for Pool<T, I>
     where T: ToOwned + Eq + Hash,
-          Rc<T::Owned>: Borrow<T>,
-          T::Owned: Eq + Hash,
+          T::Owned: Eq + Hash + Borrow<T>,
           I: SymbolId
 {
-    unsafe fn resolve_unchecked(&self, symbol: Self::Symbol) -> &Self::Stored {
-        let idx = symbol.id.to_usize().expect("Unexpected failure to convert symbol ID to usize");
+    unsafe fn resolve_unchecked(&self, symbol: Sym<I>) -> &Self::Target {
+        let idx = symbol.id().to_usize().expect("Unexpected failure to convert symbol ID to usize");
         self.lookup_vec.get_unchecked(idx).borrow()
     }
 }
