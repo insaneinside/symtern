@@ -88,7 +88,7 @@ impl<T: ?Sized, I> InternerMut<T> for Pool<T, I>
     fn intern(&mut self, value: &T) -> Result<Self::Symbol> {
         let key = core::hash::<T, core::DefaultHashAlgo>(value);
         if let Some(&id) = self.ids_map.get(&key) {
-            return Ok(sym::create(id))
+            return Ok(Sym::create(id))
         } else if self.is_full() {
             return Err(ErrorKind::PoolOverflow.into())
         } else {
@@ -101,7 +101,7 @@ impl<T: ?Sized, I> InternerMut<T> for Pool<T, I>
                 .expect("Unexpected failure to convert symbol ID from usize");
             self.ids_map.insert(key, id);
 
-            Ok(sym::create(id))
+            Ok(Sym::create(id))
         }
     }
 }

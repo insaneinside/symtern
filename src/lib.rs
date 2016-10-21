@@ -25,7 +25,7 @@
 //! use symtern::traits::*;
 //!
 //! /// Take ownership of a value, consuming it.
-//! fn consume<T>(v: T) {}
+//! fn consume<T>(_: T) {}
 //!
 //! fn main() {
 //!     let mut pool = Pool::<str, u32>::new();
@@ -99,7 +99,7 @@ pub enum ErrorKind {
     /// The underlying type used to uniquely identify symbols cannot represent
     /// any more values.
     PoolOverflow,
-    
+
     /// The given symbol does not exist in the pool that was asked to
     /// resolve it.
     NoSuchSymbol,

@@ -87,18 +87,18 @@ use ::num_traits::{Bounded, Unsigned, FromPrimitive, ToPrimitive};
 
 use super::Result;
 
+// ----------------------------------------------------------------
 
 /// Trait describing primitive types used as symbols' internal representations.
 /// This trait exists primarily for the benefit of interners in this library.
 pub trait SymbolId: Copy + Eq + Bounded + Unsigned + FromPrimitive + ToPrimitive {}
 impl<T> SymbolId for T where T: Copy + Eq + Bounded + Unsigned + FromPrimitive + ToPrimitive {}
 
-// ----------------------------------------------------------------
-
 /// Trait bounds for symbol (interned stand-in value) types.
 pub trait Symbol: Copy + PartialEq {}
 impl<T> Symbol for T where T: Copy + PartialEq<T> {}
 
+// ----------------------------------------------------------------
 
 /// Primary interface for interner implementations.
 ///
@@ -122,6 +122,8 @@ pub trait InternerMut<T: ?Sized> {
     /// does not map to any existing symbol, create and return a new one.
     fn intern(&mut self, value: &T) -> Result<Self::Symbol>;
 }
+
+// ----------------------------------------------------------------
 
 /// Trait for implementation by interners that directly provide
 /// symbol resolution.
