@@ -1,8 +1,18 @@
 [package]
 name = "symtern"
-version = "0.1.0"
+version = "0.1.0-pre.0"
 authors = ["Collin J. Sutton <collin.sutton@gmail.com>"]
-description = "Selection of String-Interning Utilities"
+description = "Fast general-purpose interners for every use case"
+
+documentation = "https://docs.rs/symtern"
+homepage = "https://github.com/insaneinside/symtern"
+repository = "https://github.com/insaneinside/symtern"
+
+readme = "README.md"
+keywords = ["interner", "interning", "string interner", "string interning", "symbol", "symbol pool"]
+license = "Apache-2.0/MIT"
+
+exclude = ["scripts"]
 
 [features]
 default = ["fnv"]

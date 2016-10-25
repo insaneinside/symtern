@@ -5,10 +5,11 @@
 // license <LICENSE-MIT or http://opensource.org/licenses/MIT>,
 // at your option. This file may not be copied, modified, or
 // distributed except according to those terms.
-//! # Selection of interning facilities in Rust
+//! # Fast general-purpose interners for every use case
 //!
-//! Symtern provides interning facilities for several use-cases (because let's
-//! face it: it's one of the least exciting parts of writing a parser).
+//! Symtern provides high-performance interners applicable to most use cases
+//! (because let's face it: it's one of the least exciting parts of writing
+//! a parser).
 //!
 //!   * [`basic`] is generic over the type of interned values, and can be
 //!     configured to use any of Rust's numeric primitives for symbol IDs.

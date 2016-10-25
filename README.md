@@ -1,6 +1,7 @@
-# Symtern: a curated selection of interners for Rust
+# Symtern: Fast general-purpose interners for every use case
 
-Symtern is a curated selection of interner implementations written in Rust.
+Symtern is a selection of high-performance interner implementations written
+in Rust.
 
 Interners, which take complex values and map them to trivially-comparable
 stand-ins that can later be resolved back to their source values, are often
