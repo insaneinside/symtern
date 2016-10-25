@@ -7,7 +7,7 @@ fn run_mode<P>(mode: &'static str, path: P)
     where P: Into<Option<&'static str>>
 {
     let mut config = compiletest::default_config();
-    let cfg_mode = mode.parse().ok().expect("Invalid mode");
+    let cfg_mode = mode.parse().expect("Invalid mode");
 
     config.mode = cfg_mode;
     config.src_base = PathBuf::from(format!("tests/{}", path.into().unwrap_or(mode)));

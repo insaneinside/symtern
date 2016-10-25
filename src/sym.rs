@@ -3,7 +3,7 @@
 
 use traits::{self, SymbolId};
 
-/// Type that will be used for Pool::Id in all generated `Pool` impls.
+/// Type that will be used for `Pool::Id` in all generated `Pool` impls.
 pub type PoolId = usize;
 
 
