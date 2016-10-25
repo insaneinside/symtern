@@ -210,3 +210,56 @@ impl<T: ?Sized, I> ResolveUnchecked<<Pool<T, I> as InternerMut<T>>::Symbol> for 
         self.lookup_vec.get_unchecked(idx).borrow()
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::Pool;
+    use traits::*;
+    use ErrorKind;
+
+    #[test]
+    fn resolve_returns_expected_results() {
+        let mut p1 = Pool::<str,u16>::new();
+        let mut p2 = Pool::<str,u16>::new();
+
+        let s1 = p1.intern("foo").unwrap();
+        let s2 = p2.intern("bar").unwrap();
+
+        assert_eq!(Ok("foo"), p1.resolve(s1));
+        assert_eq!(Ok("bar"), p2.resolve(s2));
+    }
+
+    #[test]
+    fn has_expected_len_and_capacity() {
+        let mut pool = Pool::<u16,u8>::new();
+
+        assert!(pool.is_empty());
+
+        for i in 0u16..200 {
+            pool.intern(&i).expect("failed to intern value");
+        }
+        assert_eq!(200, pool.len());
+        assert!(! pool.is_full());
+
+        for i in 150u16..250 {
+            pool.intern(&i).expect("failed to intern value");
+        }
+        assert_eq!(250, pool.len());
+        assert!(! pool.is_full());
+
+        for i in 250u16..256 {
+            pool.intern(&i).expect("failed to intern value");
+        }
+        assert_eq!(256, pool.len());
+        assert!(pool.is_full());
+
+        // The pool is full, but interning previously-interned values should
+        // still result in Ok(_).
+        pool.intern(&123).expect("failed to intern previously-interned value");
+        match pool.intern(&456) {
+            Ok(_) => panic!("unexpected `Ok` when interning unseen value in full pool"),
+            Err(e) => assert_eq!(ErrorKind::PoolOverflow, e.kind()),
+        }
+    }
+}

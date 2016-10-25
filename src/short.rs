@@ -238,3 +238,37 @@ impl<I> ResolveRef<Sym<I>> for Pool<I>
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Pool, Pack};
+    use sym::Symbol;
+    use traits::{InternerMut, ResolveRef};
+
+    /// Check that the pool's size is affected only by non-inlined values.
+    #[test]
+    fn inlined_values_do_not_affect_size() {
+        let mut pool = Pool::<u16>::new();
+        assert!(pool.is_empty());
+
+        // Inlined values shouldn't contribute to the pool's size.
+        let x = pool.intern("x").expect("failed to intern single-character string");
+        assert_eq!(0, pool.len());
+        assert!(x.id().is_inlined());
+        assert_eq!(Ok("x"), pool.resolve_ref(&x));
+
+        let xy = pool.intern("xy").expect("failed to intern two-character string");
+        assert_eq!(1, pool.len());
+        assert!(! xy.id().is_inlined());
+        assert_eq!(Ok("xy"), pool.resolve_ref(&xy));
+    }
+
+    /*/// Check that a `short` pool reports itself as full at the expected size.
+    #[test]
+    fn has_expected_capacity() {
+        // FIXME: [bug] To fill the minimum-capacity pool (Pool<u16>) to
+        // capacity, we need to generate 32768 unique string values of length
+        // two or greater; it sure would be nice if we could find a crate to
+        // help with this.
+    }*/
+}
