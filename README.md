@@ -13,8 +13,6 @@ by identity only.
 As we would expect, interning works well with string types.
 
 ```rust file="examples/intro.rs"
-use std::mem;
-
 // Import Symtern's traits, which allow us to use each interner the same way
 // regardless of the underlying implementation.
 use symtern::traits::*;
@@ -27,9 +25,6 @@ use symtern::basic::Pool;
 // `u8` as the backing representation for its symbol type.
 let mut pool = Pool::<str,u8>::new();
 if let (Ok(hello), Ok(world)) = (pool.intern("Hello"), pool.intern("World")) {
-
-    // Symbols are as small as specified.
-    assert_eq!(mem::size_of_val(&hello), mem::size_of::<u8>());
 
     assert!(hello != world);
 
