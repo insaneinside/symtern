@@ -19,5 +19,6 @@ fn run_mode<P>(mode: &'static str, path: P)
 #[test]
 fn compile_test() {
     run_mode("compile-fail", None);
+    run_mode("run-fail", None);
     run_mode("run-pass", "../examples");
 }

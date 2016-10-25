@@ -47,7 +47,7 @@ use std::{mem, str};
 use traits::{InternerMut, Resolve, ResolveRef, SymbolId};
 use {ErrorKind, Result};
 use basic;
-use sym::Symbol;
+use sym::{Symbol as ISymbol, Pool as IPool};
 
 /// Interface used to pack strings into symbol-IDs.  Any implementations of
 /// this trait *must* store inlined-string length in the most-significant
@@ -169,12 +169,34 @@ impl<I> Pool<I>
         self.backend.len()
     }
 
+    /// Check if the pool is "empty", i.e. has zero stored values.
+    ///
+    /// Because strings inlined in symbols are not stored in the pool, they do
+    /// not affect the result of this method.
+    pub fn is_empty(&self) -> bool {
+        self.backend.is_empty()
+    }
+
     /// Check if the number of interned symbols has reached the maximum allowed
     /// for the pool's ID type.
     pub fn is_full(&self) -> bool
         where I: Pack
     {
-        self.backend.len() >= I::max_value().to_usize().unwrap() / 2
+        self.backend.len() >= I::msb_mask().to_usize().unwrap()
+    }
+}
+
+impl<I> ::sym::Pool for Pool<I>
+    where I: SymbolId + Pack
+{
+    #[cfg(debug_assertions)]
+    fn id(&self) -> ::sym::PoolId {
+        self.backend.id()
+    }
+
+    type Symbol = <Self as InternerMut<str>>::Symbol;
+    fn create_symbol(&self, id: <Self::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
+        self.backend.create_symbol(id).into()
     }
 }
 
@@ -186,13 +208,13 @@ impl<I> InternerMut<str> for Pool<I>
 
     fn intern(&mut self, s: &str) -> Result<Self::Symbol> {
         match I::pack(s) {
-            Some(id) => Ok(Sym::create(id)),
+            Some(id) => Ok(self.create_symbol(id)),
             None => {
                 if self.is_full() {
                     Err(ErrorKind::PoolOverflow.into())
                 } else {
                     match self.backend.intern(s) {
-                        Ok(b) => Ok(Sym::create(b.id())),
+                        Ok(b) => Ok(b.into()),
                         Err(e) => Err(e)
                     }
                 }

@@ -69,26 +69,8 @@ match pool.intern(&1234) {
 }
 ```
 
-It's also possible for a symbol to fail to resolve.  For now this can only
-happen if you try to resolve a symbol using an interner other than the one that
-produced it:
-
-```rust file="examples/error-handling.rs" id="no-such-symbol"
-use symtern::traits::*;
-use symtern::basic::Pool;
-use symtern::ErrorKind;
-
-let mut p1 = Pool::<str,u32>::new();
-let p2 = Pool::<str,u32>::new();
-
-match p2.resolve(p1.intern("Batman").unwrap()) {
-    Ok(s) => panic!("Expected NoSuchSymbol, but got string {:?}", s),
-    Err(err) => match err.kind() {
-        ErrorKind::NoSuchSymbol => (),
-        _ => panic!("Wrong error returned from `resolve`: {}", err),
-    }
-}
-```
+It's also possible for a symbol to fail to resolve; in this case the error's
+`.kind()` method will return `ErrorKind::NoSuchSymbol`.
 
 ## API Stability
 
