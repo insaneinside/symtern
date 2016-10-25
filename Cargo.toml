@@ -9,7 +9,7 @@ homepage = "https://github.com/insaneinside/symtern"
 repository = "https://github.com/insaneinside/symtern"
 
 readme = "README.md"
-keywords = ["interner", "interning", "string interner", "string interning", "symbol", "symbol pool"]
+keywords = ["interner", "interning", "symbol", "string", "pool"]
 license = "Apache-2.0/MIT"
 
 exclude = ["scripts"]
