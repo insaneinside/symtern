@@ -1,6 +1,4 @@
 //! Simple example of using a symtern interner.
-//!
-//! Keep this file in sync with the initial example in README.md.
 extern crate symtern;
 
 use std::mem;
@@ -14,7 +12,8 @@ use symtern::traits::*;
 use symtern::basic::Pool;
 
 fn main() {
-    // Create a new pool that accepts `&str` arguments to `intern`.
+    // Create a new pool that accepts `&str` arguments to `intern`, and uses
+    // `u8` as the backing representation for its symbol type.
     let mut pool = Pool::<str,u8>::new();
     if let (Ok(hello), Ok(world)) = (pool.intern("Hello"), pool.intern("World")) {
 

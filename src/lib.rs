@@ -8,19 +8,23 @@
 //!     It is the recommended interner for most purposes.
 //!
 //!   * [`short`] is optimized for short strings, which are stored directly in
-//!     the returned symbol value when under a certain length.
+//!     the returned symbol when under a certain length.  If you expect to be
+//!     working with many short strings, it may perform better than the
+//!     `basic` interner.
 //!
 //!
 //! Each of these modules defines a `Pool` type that implements
-//! [`traits::Interner`].
+//! [`traits::InternerMut`].
 //!
-//! # Examples
+//! For a more detailed introduction to the concepts and terminology used in
+//! the library, visit [the `traits` module].
+//!
+//! ## Examples
 //!
 //! [Symbol types](traits/trait.Symbol.html) are `Copy`:  they can be passed by
 //! value without resulting in a move.
 //!
-//! ```rust
-//! extern crate symtern;
+//! ```rust file="examples/symbols-are-copy.rs" preserve=["main"]
 //! use symtern::basic::Pool;
 //! use symtern::traits::*;
 //!
@@ -35,9 +39,28 @@
 //! }
 //! ```
 //!
-//! [`traits::Interner`]: traits/trait.Interner.html
+//! ## Caveat Emptor
+//!
+//! Because of the way symbol types in this crate are represented, a symbol
+//! obtained by calling `intern` on one `Pool` instance can easily be identical
+//! to a symbol obtained from a different instance of the same `Pool` type
+//! &mdash; and will resolve without error (albeit incorrectly) on that
+//! other pool!
+//!
+//! Present-day Rust affords us no easy way to fix this without incurring
+//! additional runtime costs; see the discussion
+//! [here](traits/index.html#strikechoosingstrike-chasing-our-guarantees) for
+//! more information.
+//!
+//! When the crate is compiled in debug mode, an additional field is added to
+//! all symbol instances to allow run-time detection of attempts to resolve
+//! a symbol on the wrong resolver, and any such attempt will trigger a panic.
+//!
+//! [`traits::InternerMut`]: traits/trait.InternerMut.html
 //! [`basic`]: basic/index.html
 //! [`short`]: short/index.html
+//! [the `traits` module]: traits/index.html
+#![warn(missing_docs)]
 
 extern crate num_traits;
 #[cfg(feature = "fnv")] extern crate fnv;

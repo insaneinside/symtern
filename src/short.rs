@@ -2,14 +2,45 @@
 //!
 //! [`Pool`], the interner type implemented in this module, will encode any
 //! string _shorter_ than the symbol-ID type *directly inside the symbol*;
-//! longer inputs will be passed to some unspecified back-end implementation.
+//! strings of the same or greater size will be passed to some unspecified
+//! back-end implementation.
 //!
 //! Simple benchmarks included with the crate indicate that this gives an
 //! approximately 6x (82%) speedup over [`basic::Pool`] for strings small
 //! enough to be inlined.
 //!
+//! The downside to using this module's interner is its capacity, which is also
+//! "short": the current implementation uses one of the bits of a symbol's ID
+//! to mark it as containing an inlined string, which halves the number of
+//! addressable slots in the look-up table.  But symbols with inlined values
+//! don't occupy any space in the pool, so this may be a net gain if you expect
+//! your input to be dominated by short strings.
+//!
+//! ```rust file="examples/short.rs"
+//! use symtern::traits::*;
+//!
+//! let mut pool = symtern::short::Pool::<u64>::new();
+//! let hello = pool.intern("Hello").expect("failed to intern a value");
+//! let world = pool.intern("World").expect("failed to intern a value");
+//!
+//! assert!(hello != world);
+//!
+//! assert_eq!((Ok("Hello"), Ok("World")),
+//!            (pool.resolve_ref(&hello),
+//!             pool.resolve_ref(&world)));
+//!
+//! // Since both "Hello" and "World" are short enough to be inlined, they
+//! // don't take up any space in the pool.
+//! assert_eq!(0, pool.len());
+//! ```
+//!
+//! The internal `Pack` trait, which provides the inlining functionality, is
+//! implemented for `u16`, `u32`, and `u64`; it will be implemented for `u128`
+//! as well when support for [128-bit integers] lands.
+//!
 //! [`Pool`]: struct.Pool.html
 //! [`basic::Pool`]: ../basic/struct.Pool.html
+//! [128-bit integers]: https://github.com/rust-lang/rfcs/blob/master/text/1504-int128.md
 //!
 use std::{mem, str};
 
@@ -18,7 +49,10 @@ use {ErrorKind, Result};
 use basic;
 use sym::Symbol;
 
-/// Interface used to pack strings into symbol-IDs.
+/// Interface used to pack strings into symbol-IDs.  Any implementations of
+/// this trait *must* store inlined-string length in the most-significant
+/// _byte_ of the implementing type.
+#[doc(hidden)]
 pub trait Pack: Sized {
     /// Check if the value contains an inlined string slice.
     fn is_inlined(&self) -> bool;

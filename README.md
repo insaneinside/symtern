@@ -12,7 +12,7 @@ by identity only.
 
 As we would expect, interning works well with string types.
 
-```rust file=examples/intro.rs strip=inner-comments
+```rust file="examples/intro.rs"
 use std::mem;
 
 // Import Symtern's traits, which allow us to use each interner the same way
@@ -23,7 +23,8 @@ use symtern::traits::*;
 // value-type and the primitive type used to represent symbols.
 use symtern::basic::Pool;
 
-// Create a new pool that accepts `&str` arguments to `intern`.
+// Create a new pool that accepts `&str` arguments to `intern`, and uses
+// `u8` as the backing representation for its symbol type.
 let mut pool = Pool::<str,u8>::new();
 if let (Ok(hello), Ok(world)) = (pool.intern("Hello"), pool.intern("World")) {
 
@@ -48,7 +49,7 @@ The type used to identify a given interner's symbols can represent only
 a finite range of values; because of this you must allow for the possibility
 that any attempt to intern a value may fail.
 
-```rust file=examples/error-handling.rs id=overflow strip=inner-comments
+```rust file="examples/error-handling.rs" id="overflow"
 use symtern::traits::*;
 use symtern::basic::Pool;
 use symtern::ErrorKind;
@@ -77,7 +78,7 @@ It's also possible for a symbol to fail to resolve.  For now this can only
 happen if you try to resolve a symbol using an interner other than the one that
 produced it:
 
-```rust file=examples/error-handling.rs id=no-such-symbol strip=inner-comments
+```rust file="examples/error-handling.rs" id="no-such-symbol"
 use symtern::traits::*;
 use symtern::basic::Pool;
 use symtern::ErrorKind;

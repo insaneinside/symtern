@@ -5,10 +5,23 @@
 //! interners that produced them; any attempt to resolve such symbols on
 //! a different interner will return an error.
 //!
-//! [`Pool`](struct.Pool.html) can intern any type that implements `ToOwned`,
-//! `Eq`, and `Hash`, where its owned type (`ToOwned::Owned`) also implements
-//! `Eq` and `Hash`.
-
+//! [`Pool`] can intern any type that implements `ToOwned`, `Eq`, and `Hash`,
+//! where its owned type (`ToOwned::Owned`) also implements `Eq` and `Hash`.
+//!
+//! ```rust file="examples/you-can-intern-anything.rs"
+//! use symtern::traits::*;
+//!
+//! #[derive(Clone, Eq, PartialEq, Hash)]
+//! struct WibbleWobble {
+//!     whee: Vec<u32>
+//! }
+//!
+//! let mut pool = symtern::basic::Pool::<_,u8>::new();
+//! assert!(pool.intern(&WibbleWobble{whee: vec![1, 2, 3, 4, 5]}).is_ok());
+//! ```
+//!
+//! [`Pool`]: struct.Pool.html
+//! [`InternerMut`]: ../traits/trait.InternerMut.html
 use std::hash::Hash;
 use std::borrow::{Borrow, ToOwned};
 
@@ -28,8 +41,9 @@ type HashMap<K, V> = ::fnv::FnvHashMap<K, V>;
 type HashMap<K, V> = ::std::collections::HashMap<K, V>;
 
 /// Simple hash-based interner generic over interned type and with support for
-/// configurable symbol ID type.  See [the module-level
-/// documentation](index.html) for more information.
+/// configurable symbol ID type.
+///
+/// See [the module-level documentation](index.html) for more information.
 #[derive(Clone, Debug)]
 pub struct Pool<T: ?Sized, I = usize>
     where T: ToOwned + Eq + Hash,

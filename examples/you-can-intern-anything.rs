@@ -1,0 +1,15 @@
+//! Symtern's `basic` interner is generic over the interned object type -- in
+//! other words, you can intern *anything* that implements `Eq`, `Hash`, and
+//! `ToOwned`.  Let's try it!
+extern crate symtern;
+use symtern::traits::*;
+
+#[derive(Clone, Eq, PartialEq, Hash)]
+struct WibbleWobble {
+    whee: Vec<u32>
+}
+
+fn main() {
+    let mut pool = symtern::basic::Pool::<_,u8>::new();
+    assert!(pool.intern(&WibbleWobble{whee: vec![1, 2, 3, 4, 5]}).is_ok());
+}

@@ -18,12 +18,12 @@ pub trait Symbol {
 
 /// Define an opaque type constructor wrapping an underlying primitive ID, or
 /// other symbol type, to be used as a symbol type.  The mandatory type
-/// parameter is automatically bounded by [`traits::SymbolId`].
-///
+/// parameter is automatically bounded by [`traits::SymbolId`], and its
+/// instance is available via the private `id` field.
 ///
 /// Basic usage (wrapping primitive ID types):
 ///
-/// ```rust
+/// ```rust,ignore
 /// make_sym! {
 ///     pub MySym<I>: "My very own symbol type with its very own doc-string";
 ///     pub AnotherSym<J: ExtraTraitBound>: "This one has an extra trait bound on the primitive ID type."
@@ -31,14 +31,14 @@ pub trait Symbol {
 /// ```
 ///
 /// To wrap another symbol type, place it in parentheses after the
+/// generic-parameters list.  The wrapped value will be placed in a a private
+/// field `wrapped`.
 ///
-
-
-
-
-
-
-
+/// ```rust,ignore
+/// make_sym! {
+///     pub WrapperSym<I>(MySym<I>): "Wraps MySym<I> for extra hugs.";
+/// }
+/// ```
 macro_rules! make_sym {
     () => {};
 
