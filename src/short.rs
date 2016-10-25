@@ -53,9 +53,14 @@ use sym::Symbol;
 /// this trait *must* store inlined-string length in the most-significant
 /// _byte_ of the implementing type.
 #[doc(hidden)]
-pub trait Pack: Sized {
+pub trait Pack: Sized + PartialOrd {
     /// Check if the value contains an inlined string slice.
-    fn is_inlined(&self) -> bool;
+    fn is_inlined(&self) -> bool {
+        *self >= Self::msb_mask()
+    }
+
+    /// Get a mask for the most-significant-bit in the implementor.
+    fn msb_mask() -> Self;
 
     /// Pack a string slice into an instance of the implementing type,
     /// returning `Some(packed_value)`, or `None` if the slice is too long.
@@ -82,8 +87,8 @@ fn test_msb_mask() {
 macro_rules! impl_pack {
     ($T: tt, $N: expr) => {
         impl Pack for $T {
-            fn is_inlined(&self) -> bool {
-                *self & msb_mask!($T, $N) == msb_mask!($T, $N)
+            fn msb_mask() -> Self {
+                msb_mask!($T, $N)
             }
 
             #[cfg(target_endian = "little")]
