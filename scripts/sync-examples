@@ -5,189 +5,138 @@
 # documentation targets.
 
 require 'tomlrb'
+require_relative('lib/config-hash')
+require_relative('lib/parse')
 
-CRATE_NAME = Tomlrb.parse(File.read('Cargo.toml'), symbolize_keys: true)[:package][:name]
-PREFIXES = { '.rs' => %r{\s*//[!/] ?},
-             '.md' => %r{} }
-
-module R
-  @group_name = '_g0'
-  def self.gn()
-    @group_name.succ!
-  end
-  class Escaped < String
-  end
-  def self.escape(s)
-    if s.kind_of?(Escaped)
-      s
-    elsif s.kind_of?(String)
-      Escaped.new(Regexp.escape(s))
-    else
-      s
-    end
-  end
-    
-  def self.list(sep, pat)
-    sep = escape(sep)
-    
-    pat1, pat2 = pat.respond_to?(:call) \
-      ? [pat.call(), pat.call()] \
-      : [pat, pat]
-      
-    /#{pat1}(?:\s*#{sep}\s*#{pat2})*/m
-  end
-  IDENT = /[_a-zA-Z][_a-zA-Z0-9]*/
-  TAG_NAME = /[-a-zA-Z][-.a-zA-Z0-9]*/
-  EXTERN_CRATE = /extern\s+crate\s+(?<crate>#{IDENT})(?:\s+as\s+(?<alias>#{IDENT}))?\s*;/m
-  def self.tag(name = TAG_NAME)
-    name = escape(name)
-    %r{//`\s*id\s*=\s*#{name}\s*\n|/\*`\s*id\s*=\s*#{name}\s*\*/}
-  end
-  TAG = tag()
-  BLOCK = /(?<block>\{(?:[^\{\}]|\g<block>)*\})/m
-  def self.tagged_block(name = TAG_NAME)
-    /#{tag(name)}\s*#{BLOCK}/m
-  end
-  TAGGED_BLOCK = tagged_block()
-  def self.balanced(s, name)
-    a, b = [Regexp.escape(s[0]), Regexp.escape(s[1])]
-    /(?<#{name}>#{a}(?:[^#{a}#{b}]|\g<#{name}>)*#{b})/m
-  end
-
-  def self.generics(name)
-    self.balanced('<>', name)
-  end
-
-  def self.path()
-    /(?:[!?]\s*)?#{list('::', lambda { || /#{IDENT}|#{generics(gn())}|#{IDENT}\s*#{generics(gn())}/ })}/
-  end
-
-  def self.ident_or_path()
-    /'#{IDENT}|#{path()}/
-  end
-  def self.bounds_clause(); /#{ident_or_path()}\s*:\s*#{list('+', lambda { || ident_or_path() })}/m; end
-  def self.where_clause(); /where\s+#{list(',', lambda { || bounds_clause()})}/m; end
-  IMPL = /impl#{generics(gn())}?\s+#{path()}(?:\s+for\s+#{path()})?(?:\s+#{where_clause})?\s*#{BLOCK}/m
-  def self.fn(name = IDENT)
-    name = escape(name)
-    /(?:pub\s+)?fn\s+(?<fn_name>#{name})(?:\s*#{generics(gn())})?\s*#{balanced('()', 'arguments')}(?:\s*#{where_clause})?\s*#{BLOCK}/m
-  end
-  FN = self.fn()
-  META = /\#!?#{balanced('[]', gn())}/m
-  STRUCT_OR_ENUM = /(?:pub\s+)?(?:struct|enum)\s+#{IDENT}(?:\s*#{generics(gn())})?(?:\s*#{where_clause})?\s*#{BLOCK}/
-  NEWTYPE = /(?:pub\s+)?struct\s+#{IDENT}(?:\s*#{generics(gn())})?\s*#{balanced('()', gn())}(?:\s*#{where_clause})?\s*;/
-  TYPE_ALIAS = /(?:pub\s+)?(?:type)\s+#{IDENT}\s*=\s*#{path()}\s*;/m
-
-  BLOCK_COMMENT_CONTENTS = %r{[^*/]|\*(?!/)|(?<!\*)/}
-  LINE_COMMENT_CONTENTS = /[^\n]/
-
-  def self.block_comment(contents = nil)
-    if contents.nil?
-      name = gn()
-      %r{(?<#{name}>/\*(?:#{BLOCK_COMMENT_CONTENTS}|\g<#{name}>)*\*/)}m
-    else
-      contents = escape(contents)
-      %r{/\*#{contents}\*/}
-    end
-  end
-  def self.line_comment(contents = nil)
-    if contents.nil?
-      contents = /#{LINE_COMMENT_CONTENTS}*/
-    else
-      contents = escape(contents)
-    end
-    %r{//#{contents}\n}
-  end
-
-  def self.comment(contents = nil)
-    /#{block_comment(contents)}|#{line_comment(contents)}/
-  end
-    
-  COMMENT = /#{block_comment()}|#{line_comment()}/
-  INNER_LINE_COMMENT = line_comment(/!#{LINE_COMMENT_CONTENTS}*/)
-  INNER_BLOCK_COMMENT = block_comment(%r{!#{BLOCK_COMMENT_CONTENTS}*})
-  INNER_COMMENT = /#{INNER_BLOCK_COMMENT}|#{INNER_LINE_COMMENT}/
-  ELLIPSIS_COMMENT = comment(/\s*...\s*/)
-
-  def self.anchored(re); /\A#{re}/; end
-
-  def self.all_matches(re, s, ofs = 0)
-    o = []
-    while ofs < s.length && ! (m = re.match(s, ofs)).nil?
-      o << m
-      ofs = m.end(0)
-    end
-    o
+# Find Cargo.toml
+lastdir = nil
+dir = Dir.pwd
+while lastdir != dir
+  if File.exist?(path = File.join(dir, 'Cargo.toml'))
+    Object.const_set(:CARGO_TOML, path)
+    break
+  else
+    lastdir = dir
+    dir = File.dirname(dir)
   end
 end
+if ! Object.const_defined?(:CARGO_TOML)
+  raise 'Failed to find Cargo.toml'
+end
 
+CRATE_NAME = Tomlrb.parse(File.read(CARGO_TOML), symbolize_keys: true)[:package][:name]
+PREFIXES = { '.rs' => %r{[ \t]*//[/!] ?},
+             '.md' => %r{} }
+SUPPORTED_FILE_REGEXP = /\.(?:rs|md)\z/
+IGNORE_PATTERNS = /\A(?:\.|\.\.)\z|~\z/
+DEFAULT_CODE_CHUNK_ATTRS = { strip: ['inner-comments', 'license-header'] }
+LICENSE_HEADER_TEXT = File.read(File.join(__dir__, 'data', 'license-header.rs'))
 
 # Given the `block` submatch from a BLOCK_REGEXP match, return the part inside
 # the outermost pair of braces with extraneous indentation removed.
-def extract_block_contents(s)
+def normalize_block_contents(s)
   # Remove the enclosing braces and strip the common-prefix indent (on
   # non-blank lines) after normalizing tabs as spaces.
-  lines = s[1...-1].lines().map { |l| l.tr("\t", ' ' * 8) }
+  lines = s.lines().map { |l| l.tr("\t", ' ' * 8) }
   strip_regexp = Regexp.new('\A[ ]{0,%u}' % lines.select { |l| l =~ /[^\n ]/ }.map { |l| l =~ /[^ ]/ }.min)
-  lines.map { |l| l.sub(strip_regexp, '') }.join('').strip()
+  lines.map { |l| l.sub(strip_regexp, '').chop }.join("\n")
 end
+
+# Fetch the contents of a brace-enclosed block (if the input truly is
+# brace-enclosed).
+#
+# Preserves non-brace-enclosed strings as they are; strips all consecutive
+# directly newlines following the opening brace.
+def block_inner(s)
+  if s.kind_of?(MatchData)
+    s = s[:tcb_contents] || s[:block]
+  end
+  st = s[0] == '{' ? 1 : 0
+  st += 1 while s[st] =~ /\n/
+
+  en = s[-1] == '}' ? -2 : -1
+  s[st..en]
+end
+
+# Remove everything that follows an ellipsis comment inside a block
+def strip_block_contents_after_ellipsis_comments(s)
+  out = s.dup
+  ofs = 0
+  while ! (m = Rust::R::ELLIPSIS_COMMENT.match(out, ofs)).nil?
+    strip_begin = m.end(0)
+    ofs = strip_begin
+    # Find the containing block
+    block_start = out.rindex('{', m.begin(0))
+    next if block_start.nil?
+    next if (m = Rust::R::BLOCK.match(out, block_start)).nil?
+    # Preserve whitespcace before the closing brace
+    block_inner_end = m.begin(0) + /\s*}\z/m.match(m[0]).begin(0) + 1
+    out.slice!(strip_begin...block_inner_end)
+  end
+  out
+end
+
 
 # Retrieve a code sample from a file, transforming it appropriately for an
 # idiomatic Rust code sample.  If `id` is non-`nil`, searches for and includes
 # only the named block (as tagged with a comment "//` id=#{id}" or
 # "/*` id=#{id}*/").
-def fetch_code(attrs)
+def fetch_external_code(attrs)
   input = File.read(attrs[:file])
   output = input.dup
-  extern_crates = R.all_matches(R::EXTERN_CRATE, input)
+  tokens = Rust::Parser.parse_string(input)
+  extern_crates = tokens.select { |tok| tok.type == :extern_crate }
+
+  ignore_block_regexp = Rust::R::tagged_block(/\s*ignore\s*/)
+  while ! (m = output.match(ignore_block_regexp)).nil?
+    output.slice!(m.begin(0)..m.end(0))
+  end
 
   can_open_code_main = false
 
   # If there's only a single `extern crate` declaration, and it's the local
   # project and has not been aliased, expunge it.
-  if extern_crates.length == 1 && (c = extern_crates.first)[:crate] == CRATE_NAME && c[:alias].nil?
-    output.sub!(/#{Regexp.escape(c[0])}\s*\n/, '')
-    can_open_code_main = true
+  if extern_crates.length == 1 && extern_crates.first.value.effective_name == CRATE_NAME
+    output.sub!(/#{Regexp.escape(extern_crates.first.string)}\s*\n/, '')
+    can_open_code_main = true unless attrs.fetch(:preserve, []).include?('main')
   end
 
   # Strip various things
   if attrs.key?(:strip)
-    for item in attrs[:strip].split(',')
+    for item in attrs.fetch(:strip, [])
       case item
+      when 'license-header'
+        output.sub!(LICENSE_HEADER_TEXT, '')
       when 'inner-comments'
-        output.gsub!(R::INNER_COMMENT, '')
+        output.gsub!(Rust::R::INNER_COMMENT, '')
+      when 'main'
+        can_open_code_main = true
       else
         raise "Unknown strip item: #{item}"
       end
     end
   end
+
   # Remove everything that follows an ellipsis comment inside a block
-  ofs = 0
-  while ! (m = R::ELLIPSIS_COMMENT.match(output, ofs)).nil?
-    strip_begin = m.end(0)
-    ofs = strip_begin
-    # Find the containing block
-    block_start = output.rindex('{', m.begin(0))
-    next if block_start.nil?
-    next if (m = R::BLOCK.match(output, block_start)).nil?
-    # Preserve whitespcace before the closing brace
-    block_inner_end = m.begin(0) + /\s*}\z/m.match(m[0]).begin(0) + 1
-    output.slice!(strip_begin...block_inner_end)
+  output = strip_block_contents_after_ellipsis_comments(output)
+
+  if (main_fn = Rust::R.fn('main').match(input)).nil?
+    raise 'Failed to find `main` in %s' % attrs[:file]
   end
 
-  main_fn = R.fn('main').match(input)
-
-
   if attrs.key?(:id)
-    # If a tagged block was requested, fetch it from `main`
-    if (m = R::tagged_block(attrs[:id]).match(main_fn[:block])).nil?
-      $stderr.puts("No such tagged block \"#{id}\" in #{file}")
-      output
+    id_tag = Rust::R::id_tag(attrs[:id])
+
+    # If a tagged block was requested, fetch it
+    if ! (m = Rust::R::tagged_block(id_tag).match(input)).nil?
+      contents = normalize_block_contents(block_inner(m))
+      output.sub(main_fn[0], contents)
     else
-      output.sub(main_fn[0], extract_block_contents(m[:block])).strip
+      $stderr.puts("No such tagged block \"#{attrs[:id]}\" in #{attrs[:file]}")
+      return nil
     end
   elsif can_open_code_main
-    output.sub(main_fn[0], extract_block_contents(main_fn[:block]))
+    output.sub(main_fn[0], normalize_block_contents(block_inner(main_fn[:block])))
   else
     output
   end
@@ -198,94 +147,148 @@ end
 class CodeChunk
   attr_reader :content
   attr_reader :attributes
+  attr_reader :prefix
+  attr_reader :orig
+  attr_reader :open_line
+  attr_reader :close_line
   def initialize(content:, file:, line:,
-                 open_fence:, close_fence:,
+                 open_line:, close_line:,
+                 orig:,
                  prefix: '',
                  attributes: {})
     @file = file
     @line = line
     @content = content
     @attributes = attributes
-    @open_fence = open_fence
-    @close_fence = close_fence
+    @open_line = open_line
+    @close_line = close_line
     @prefix = prefix
+    @orig = orig
   end
   def attributes_to_s
     '%s %s' % [@attributes[:language],
-               @attributes.reject { |k,_| k == :language }.map  { |k, v| '%s=%s' % [k.to_s, v.to_s] }.join(' ')]
+               @attributes.reject { |k,_| k == :language }.map  { |k, v| '%s=%s' % [k.to_s, v.inspect] }.join(' ')]
   end
-  def to_s
-    code =
-      if @attributes.key?(:file)
-        fetch_code(@attributes) \
-          || raise("Failed to load external code chunk for #{self.inspect}")
+
+  def fetch_code()
+    if @attributes.key?(:file)
+      if (out = fetch_external_code(@attributes)).nil?
+        $stderr.puts("Failed to load external code for code chunk at #{self.location_string}")
+        nil
       else
-        if @attributes.key?(:id)
-          $stderr.puts("WARNING: no source file specified for fenced code block \"#{@attributes[:id]}\" at #{@file}:#{@line}")
-        end
-        @content
+        out
       end
-    "#{@open_fence}#{attributes_to_s()}\n#{code.strip}\n#{@close_fence}\n\n".gsub(/^/, @prefix)
+    else
+      if @attributes.key?(:id)
+        $stderr.puts("WARNING: no source file specified for fenced code block \"#{@attributes[:id]}\" at #{@file}:#{@line}")
+      end
+      @content
+    end
   end
+
+  def to_s
+    if ! @attributes.key?(:file) && ! @attributes.key?(:id)
+      @orig
+    else
+      code = fetch_code()
+      if code.nil?
+        @orig
+      else
+        "#{@open_line}#{code.strip}\n#{@close_line}".
+          gsub(/^(?!\s*#{Regexp.escape(@prefix.strip)})/, @prefix).
+          gsub(/[ ]+$/, '')
+      end
+    end
+  end
+  def location_string
+    '%s:%u' % [@file, @line]
+  end
+
   def inspect
     '#<%s:%#x %s:%u %s>' % [self.class, self.object_id, @file, @line,  @attributes.map { |k, v| '%s=%s' % [k.to_s, v.inspect] }.join(' ')]
   end
 end
 
-# Divide a string containing Markdown syntax into a series of alternating
-# TextChunk and CodeChunk instances
+def chunk(filename, opts = {})
+  input = File.read(filename)
+  opts = opts.merge(chunk_opts_for(filename))
+  chunk_string(input, opts)
+end
+
+# Divide the contents of a file containing Markdown syntax into a series of
+# alternating TextChunk and CodeChunk instances
 #
 # @param [String] input Markdown input string.
-def chunk(filename, prefix = //)
-  input = File.read(filename)
+def chunk_string(input, opts = {})
   chunks = []
   line = 0
-
+  prefix = opts[:prefix] || %r{}
+  open_line_regexp = /^(?<prefix>#{prefix})(?<open_fence>(?<indent>[ ]{0,3})(?<fence>`{3,}|~{3,}))\s*(?<info_string>[^\n]*)\n/
   while ! input.empty?
-    pre, sep, post = input.partition(/^(?<prefix>#{prefix})(?<open_fence>(?<indent>[ ]{0,3})(?<fence>`{3,}|~{3,}))\s*(?<info_string>[^\n]*)\n/)
+    pre, open_line, open_post = input.partition(open_line_regexp)
     unless pre.empty?
       chunks << TextChunk.new(pre) 
       line += pre.count("\n")
     end
-    line += sep.count("\n")
+    line += open_line.count("\n")
 
-    if ! (m = Regexp.last_match).nil?
-      indent = m[:indent]
-      fence = m[:fence]
-      open_fence = m[:open_fence]
-      info_string = m[:info_string].strip
-      open_prefix = m[:prefix]
+    if open_line.empty?
+      post = open_post
+    else
+      open_match = Regexp.last_match
+      indent = open_match[:indent]
+      fence = open_match[:fence]
+      info_string = open_match[:info_string].strip
+      open_prefix = open_match[:prefix]
+
+      # We've got the open-fence of the code block; now grab the body and
+      # close-fence.
 
       # Closing fence uses the same character as the opening fence, and must
       # be at least the same number of characters.  It may not be followed by
       # anything but spaces on the same line, but may be indented up to three
       # spaces regardless of the indent on the opening fence.
-      body, sep, post = post.partition(/^(?<prefix>#{prefix})(?<close_fence>[ ]{0,3}#{fence}#{fence[0]}*)\s*\n/)
+      close_line_regexp = /(?<prefix>#{prefix})(?<close_fence>[ ]{0,3}#{fence}#{fence[0]}*)\s*(?=\n|$)/
+      body, close_line, post = open_post.partition(close_line_regexp)
+      close_match = Regexp.last_match
+
       code_line = line
-      line += body.count("\n") + sep.count("\n")
+      line += body.count("\n") + close_line.count("\n")
 
-      close_fence = Regexp.last_match[:close_fence]
-      close_prefix = Regexp.last_match[:prefix]
-      attrs_ary = info_string.split()
-      attrs = {}
+      if close_match.nil?
+        binding.pry
+        raise 'Unclosed code block at %s:%u' % [opts[:filename], code_line]
+      end
+
+      orig = open_line + body + close_line
+
+      close_prefix = close_match[:prefix]
+      attrs_ary = info_string.split($;, 2)
+      attrs = opts.fetch(:attrs) { ConfigHash.new(defaults: DEFAULT_CODE_CHUNK_ATTRS) }.dup
       attrs[:language] = attrs_ary.shift
-      attrs_ary.map { |s| s.split('=') }.each { |x| attrs[x.first.tr('-', '_').intern] = x.last }
+      if ! attrs_ary.empty?
+        intern_keys = lambda { |hsh| hsh.kind_of?(Hash) ? hsh.collect { |k,v| [k.intern, intern_keys[v]] }.to_h : hsh }
+        begin
+          attrs.merge!(intern_keys[Tomlrb.parse(attrs_ary.shift)])
+        rescue Tomlrb::ParseError => err
+          $stderr.puts('Error while parsing info string for code block at %s:%u: %s' % [opts[:filename], code_line, err.message])
+          raise err
+        end
+      end
 
-      unindent_regexp = Regexp.new('^[ ]{0,%u}' % indent.length)
-      body.gsub!(unindent_regexp, '')
+      unindent_regexp = Regexp.new('[ ]{0,%u}' % indent.length)
+      body.gsub!(/^#{prefix}#{unindent_regexp}/, '')
 
       # If the line prefixes differ, we've probably parsed
       # something incorrectly.
-      prefix = if open_prefix != close_prefix
-                 raise 'Prefix mismatch:  open fence had prefix %s, close fence had prefix %s' % [open_prefix, close_prefix]
-               else
-                 open_prefix
-               end
+      if open_prefix != close_prefix
+        raise 'Prefix mismatch:  open fence had prefix %s, close fence had prefix %s' % [open_prefix.inspect, close_prefix.inspect]
+      end
 
-      chunks << CodeChunk.new(content: body, file: filename, line: code_line,
-                              open_fence: open_fence, close_fence: close_fence,
-                              prefix: prefix,
-                              attributes: attrs)
+      chunks << CodeChunk.new(content: body, file: opts[:filename], line: code_line,
+                              open_line: open_line, close_line: close_line,
+                              prefix: open_prefix, attributes: attrs,
+                              orig: orig)
     end
     input = post
   end
@@ -298,15 +301,176 @@ class Chunks < Array
   end
 end
 
-def transform_file(fname, io = $stdout)
-  io.write(chunk(fname, PREFIXES[File.extname(fname)]).to_s)
+def chunk_opts_for(fname)
+  {filename: fname, prefix: PREFIXES[File.extname(fname)]}
+end
+def collect_code_chunks(fname, opts, out = [])
+  if File.directory?(fname)
+    for entry in Dir.foreach(fname).reject { |e| e !~ SUPPORTED_FILE_REGEXP }
+      collect_code_chunks(File.join(fname, entry), opts, out)
+    end
+  elsif File.file?(fname)
+    out.concat(chunk(fname, opts).select { |c| c.kind_of?(CodeChunk) })
+  end
+
+  out
+end
+
+class MissingAttributeError < ::RuntimeError
+  def initialize(attr, chunks)
+    @attr = attr
+    @chunks = chunks
+    super('Missing attribute `%s` on %u code block%s' %
+          [@attr.to_s, @chunks.length, @chunks.length == 1 ? '' : 's'])
+  end
+
+  def to_s
+    if @chunks.length == 1
+      'Missing attribute `%s` on code block at %s' %
+        [@attr.to_s, @chunks.first.location_string]
+    else
+      "Missing attribute `%s` on %u code blocks:\n    %s" %
+        [@attr.to_s, @chunks.length, @chunks.collect { |c| c.location_string }.join("\n    ")]
+    end
+  end
+end
+
+# Determine the number of elements in the shared prefix of a set of arrays
+#
+# @param [Array<Array<Object>>] toks
+def common_prefix_len(toks)
+  n = toks.map { |t| t.length }.min()
+  is_prefix = lambda { |_n| toks[1..-1].all? { |t| t[0..._n] == toks.first[0..._n] }}
+  while n > 1 && ! is_prefix[n]
+    n -= 1
+  end
+  n
+end
+
+SOURCE_FILE_TEMPLATE = <<RUST
+extern crate #{CRATE_NAME};
+%s
+
+fn main() {
+%s
+}
+RUST
+
+def combine_chunks_for_file(chunks)
+  have_ids = chunks.any? { |c| c.attributes.key?(:id) }
+  if have_ids && ! (no_id_chunks = chunks.reject { |c| c.attributes.key?(:id) }).empty?
+    raise MissingAttributeError.new(:id, no_id_chunks)
+  end
+  chunks_ary = chunks.collect { |c| Rust::Parser.parse_string(c.content) }
+  pre, main =
+    if chunks.length > 1
+      chunks_ary = chunks_ary.map { |c| c.map { |t| t.string } }
+      prefix_len = common_prefix_len(chunks_ary)
+      prefix = chunks_ary.first[0...prefix_len]
+      chunks_ary.each { |t| t.shift(prefix_len) }
+
+      pre = prefix.join('')
+      main = if have_ids
+               0...chunks.length.collect do |i|
+                 id = chunks[i].attributes[:id]
+                 "//` id=#{id} { \n" + chunks_ary[i].join('') + "//` }\n"
+               end
+             else
+               chunks_ary.collect { |c| c.join('') }
+             end.join("\n").gsub(/^/, '    ')
+      [pre, main]
+    else
+      c = chunks_ary.first
+      raise 'FIXME'
+    end
+  SOURCE_FILE_TEMPLATE % [pre, main]
+end
+
+
+def query?(prompt)
+  $stderr.write("#{prompt} ")
+  r = $stdin.gets() =~ /\A[yY]\n\z/
+  $stderr.puts("\n")
+  r
+end
+
+def transform!(fname, opts)
+  chunks_by_file = collect_code_chunks(fname, opts).
+    reject { |c| c.attributes[:file].nil? }.
+    group_by { |c| c.attributes[:file] }
+  # Offer to write out missing example files.
+  for src, chunks in chunks_by_file.reject { |f, _| File.exist?(f) }
+    if query?("External file \"#{src}\" is missing.  Create it?")
+      output = combine_chunks_for_file(chunks)
+      File.open(src, 'w') do |io|
+        io.write(output)
+      end
+    end
+  end
+
+
+  if File.directory?(fname)
+    for entry in Dir.foreach(fname).reject { |e| e =~ IGNORE_PATTERNS }
+      transform!(File.join(fname, entry), opts)
+    end
+  elsif File.file?(fname) && fname =~ SUPPORTED_FILE_REGEXP
+    chunks = chunk(fname, opts)
+    if opts[:output].nil?
+      fnew = fname + '.new'
+      File.open(fnew, 'w') { |io| io.write(chunks.to_s) }
+      diff = IO.popen(['diff', '-u', '--color=always', fname, fnew]) { |io| io.read() }
+      if diff.empty?
+        if opts[:verbose]
+          $stderr.puts('%-32s -> no changes' % fname)
+        end
+        File.unlink(fnew)
+      else
+        $stderr.write(diff)
+        
+        if query?('Apply these changes?')
+          File.rename(fnew, fname)
+        else
+          File.unlink(fnew)
+        end
+      end
+    else
+      opts[:output].write(chunks.to_s)
+    end
+  end
 end
 
 if caller[0].nil?
-  INPUT = 'README.md'
-  chunks = chunk(INPUT)
-  #File.rename(INPUT, INPUT + '.bak')
+  require 'optparse'
+  opts = { output: nil, verbose: false, attrs: ConfigHash.new(defaults: DEFAULT_CODE_CHUNK_ATTRS) }
+  mode = :substitute
+  OptionParser.new do |o|
+    o.banner = 'Usage: %s [OPTION]... TARGET...' % $0
+    o.on('-E', '--extract', 'Extract code samples from each TARGET') { mode = :extract }
+    o.on('-O', '--option KEY=VALUE', 'Pre-load an attribute\'s default for fenced code blocks') do |s|
+      k, v = s.split('=', 2)
+      opts[:attrs][k.intern] = v
+    end
+    o.on('-o', '--output=FILE', 'Write all output to FILE') do |out|
+      opts[:output] = if out == '-'
+                        $stdout
+                      else
+                        File.open(out, 'w')
+                      end
+    end
+    o.on('-v', '--verbose', 'Be more chatty when processing files.') { opts[:verbose] = true }
+    o.on('-h', '--help', 'Show this help') { $stdout.puts(o); exit(0); }
+  end.parse!
 
-  io = $stdout #File.open(INPUT, 'w')
-  io.write(file.to_s)
+
+  if mode == :substitute
+    ARGV.each do |filename|
+      transform!(filename, opts)
+    end
+  elsif mode == :extract
+    ARGV.each do |filename|
+      (opts[:output] || $stdout).write(fetch_code(opts[:attrs].merge(file: filename)))
+    end
+  else
+    raise 'Unknown mode: %s' % mode.inspect
+  end
 end

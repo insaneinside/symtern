@@ -1,0 +1,13 @@
+#!/bin/sh
+
+HEADER_FILE="$(dirname $0)/data/license-header.rs"
+
+if test $# -lt 1; then
+    echo "Usage: $0 FILE..." > /dev/stderr
+    exit 1
+fi
+
+for FILE in "$@"; do
+    cat "$HEADER_FILE" "$FILE" > "$FILE.new" \
+        && mv "$FILE.new" "$FILE"
+done    
