@@ -51,7 +51,7 @@
 //!
 use std::{mem, str};
 
-use traits::{InternerMut, Resolve, ResolveRef, SymbolId};
+use traits::{InternerMut, Len, Resolve, ResolveRef, SymbolId};
 use {ErrorKind, Result};
 use basic;
 use sym::{Symbol as ISymbol, Pool as IPool};
@@ -169,10 +169,16 @@ impl<I> Pool<I>
     pub fn new() -> Self {
         Pool{backend: basic::Pool::new()}
     }
+}
 
+impl<B> Len for Pool<B>
+    where B: Len,
+          B::Symbol: sym::Symbol,
+          <B::Symbol as sym::Symbol>::Id: Pack + ToPrimitive
+{
     /// Fetch the number of items contained in the pool.  The returned value
     /// does not count values inlined in symbols.
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.backend.len()
     }
 
@@ -180,16 +186,14 @@ impl<I> Pool<I>
     ///
     /// Because strings inlined in symbols are not stored in the pool, they do
     /// not affect the result of this method.
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.backend.is_empty()
     }
 
     /// Check if the number of interned symbols has reached the maximum allowed
     /// for the pool's ID type.
-    pub fn is_full(&self) -> bool
-        where I: Pack
-    {
-        self.backend.len() >= I::msb_mask().to_usize().unwrap()
+    fn is_full(&self) -> bool {
+        self.backend.len() >= <<B::Symbol as sym::Symbol>::Id as Pack>::msb_mask().to_usize().unwrap()
     }
 }
 

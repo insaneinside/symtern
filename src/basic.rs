@@ -33,7 +33,7 @@ use std::hash::Hash;
 use std::borrow::{Borrow, ToOwned};
 #[cfg(debug_assertions)] use std::sync::atomic::{self, AtomicUsize, Ordering};
 
-use traits::{InternerMut, SymbolId, Resolve, ResolveUnchecked};
+use traits::{InternerMut, Len, SymbolId, Resolve, ResolveUnchecked};
 use {core, Result, ErrorKind};
 use sym::{Symbol as ISymbol, Pool as IPool};
 
@@ -79,20 +79,26 @@ impl<T: ?Sized, I> Pool<T, I>
     pub fn new() -> Self {
         Default::default()
     }
+}
 
+impl<T: ?Sized, I> Len for Pool<T, I>
+    where T: ToOwned + Eq + Hash,
+          T::Owned: Eq + Hash,
+          I: SymbolId
+{
     /// Get the number of entries contained in the pool.
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.lookup_vec.len()
     }
 
     /// Check if the pool is "empty", i.e. has zero stored values.
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.lookup_vec.is_empty()
     }
 
     /// Check if the number of interned symbols has reached the maximum allowed
     /// for the pool's ID type.
-    pub fn is_full(&self) -> bool {
+    fn is_full(&self) -> bool {
         // Symbol IDs range from 0 to M, where M is given by `I::max_value()`;
         // hence a pool containing N entries is full iff N == M + 1.
         let len = self.len();

@@ -268,3 +268,17 @@ pub trait ResolveRef<S> where S: Symbol {
         where 'a: 'c,
               'b: 'c;
 }
+
+
+/// Trait for use with interners can report the number of values they contain.
+pub trait Len {
+    /// Fetch the number of values contained in the interner.
+    fn len(&self) -> usize;
+
+    /// Check if the number of interned symbols has reached the
+    /// maximum allowed.
+    fn is_full(&self) -> bool;
+
+    /// Check if the interner is "empty", i.e. has zero stored values.
+    fn is_empty(&self) -> bool;
+}
