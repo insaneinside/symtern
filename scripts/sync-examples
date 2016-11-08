@@ -38,7 +38,8 @@ def normalize_block_contents(s)
   # Remove the enclosing braces and strip the common-prefix indent (on
   # non-blank lines) after normalizing tabs as spaces.
   lines = s.lines().map { |l| l.tr("\t", ' ' * 8) }
-  strip_regexp = Regexp.new('\A[ ]{0,%u}' % lines.select { |l| l =~ /[^\n ]/ }.map { |l| l =~ /[^ ]/ }.min)
+  strip_length = lines.select { |l| l =~ /[^\n ]/ }.map { |l| l =~ /[^ ]/ }.min || 0
+  strip_regexp = Regexp.new('\A[ ]{0,%u}' % strip_length)
   lines.map { |l| l.sub(strip_regexp, '').chop }.join("\n")
 end
 

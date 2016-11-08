@@ -86,7 +86,8 @@ module Rust
     EXTERN_CRATE = /extern\s+crate\s+(?<crate>#{IDENT})(?:\s+as\s+(?<alias>#{IDENT}))?\s*;/m
     MOD = /(?:pub\s+)?mod\s+(?<mod>#{IDENT})\s*(?:#{BLOCK}|;)/
 
-    USE_DECL = /(?:pub\s+)?use\s+#{path()}(?:\s*::\s*(?:\*|#{IDENT}|\{\s*#{list(/\s*,\s*/, IDENT)}\s*\}))?\s*;/m
+    IDENT_AS_IDENT = /#{IDENT}(?:\s+as\s+#{IDENT})?/
+    USE_DECL = /(?:pub\s+)?use\s+#{path()}(?:\s*::\s*(?:\*|#{IDENT_AS_IDENT}|\{\s*#{list(/\s*,\s*/, IDENT_AS_IDENT)}\s*\}))?\s*;/m
 
 
     FN = self.fn()

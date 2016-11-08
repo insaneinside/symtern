@@ -1,4 +1,20 @@
 module ReLemon
+  # Error raised when problems are detected in the input grammar.
+  class GrammarError < ::RuntimeError
+    attr_reader :file, :line, :column
+    def initialize(msg, file, line, column = nil)
+      @file = file
+      if column.nil?
+        @line = line.line
+        @column = line.column
+      else
+        @line = line
+        @column = column
+      end
+      super('%s:%s:%s: %s' % [@file, @line, @column, msg])
+    end
+  end
+
   # Base parser class providing common functionality for both re2c and
   # Lemon parsers.
   module Parser
