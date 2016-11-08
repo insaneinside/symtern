@@ -17,13 +17,16 @@ fn main() {
         //` id=create {
         // Nearly all functionality is in the trait implementations, so we simply
         // glob-import the traits.
-        use symtern::traits::*;
+        use symtern::prelude::*;
+        use symtern::Pool;
+        use symtern::adaptors::Inline;
 
-        let mut basic_pool = symtern::basic::Pool::<str,u16>::new();
+
+        let mut basic_pool = Pool::<str,u16>::new();
         let cat = basic_pool.intern("Kibbles").expect("Failed to intern the cat");
 
-        let mut short_pool = symtern::short::Pool::<u64>::new();
-        let dog = short_pool.intern("Fido").expect("Failed to intern the dog");
+        let mut inline_pool = Inline::<Pool<str, u64>>::new();
+        let dog = inline_pool.intern("Fido").expect("Failed to intern the dog");
         //` }
 
         // With interners that implement the `Resolve` trait, we can resolve
@@ -34,18 +37,18 @@ fn main() {
         //` }
 
 
-        // Some interners -- for whatever implementation-specific reason -- require
-        // a reference instead of a copy of a symbol in order to resolve it.
-        // In these cases we use the `resolve_ref` function, which is so named to
-        // avoid confusion over the different syntax we use when calling it.
+        // Some interners -- for whatever implementation-specific reason --
+        // require a reference instead of a copy of a symbol in order to
+        // resolve it; look for a reference type in the `Input` associated type
+        // of type's `Resolve` implementation to identify them.l
         //` id=resolve_ref {
-        assert_eq!(Ok("Fido"), short_pool.resolve_ref(&dog));
+        assert_eq!(Ok("Fido"), inline_pool.resolve(&dog));
         //` }
     }
 
     intern_with_error_handling().expect("we didn't actually expect an error here!");
     resolve_with_error_handling().expect("we didn't actually expect an error here!");
-    resolve_ref_with_error_handling().expect("we didn't actually expect an error here!");
+    resolve_unchecked().expect("we didn't actually expect an error here!");
 }
 
 //` ignore {
@@ -54,13 +57,13 @@ fn main() {
 // can demonstrate what error handling might look like when using custom
 // error types.
 type MyErrorType = symtern::Error;
-use symtern::traits::*;
-use symtern::{basic, short};
-use symtern::Result;
+use symtern::prelude::*;
+use symtern::adaptors::Inline;
+use symtern::{Pool, Result};
 
 #[allow(unused_variables)]
 fn intern_with_error_handling() -> Result<()> {
-    let mut some_interner = short::Pool::<u64>::new();
+    let mut some_interner = Inline::<Pool<str,u64>>::new();
     //` id=intern-with-error-handling {
     let symbol = match some_interner.intern("Rosebud") {
         Ok(sym) => sym,
@@ -72,7 +75,7 @@ fn intern_with_error_handling() -> Result<()> {
 
 #[allow(unused_variables)]
 fn resolve_with_error_handling() -> Result<()> {
-    let mut some_pool = basic::Pool::<str,u8>::new();
+    let mut some_pool = Pool::<str,u8>::new();
     let sym = some_pool.intern("abc").unwrap();
 
     //` id=resolve-with-error-handling {
@@ -84,16 +87,12 @@ fn resolve_with_error_handling() -> Result<()> {
     Ok(())
 }
 
-#[allow(unused_variables)]
-fn resolve_ref_with_error_handling() -> Result<()> {
-    let mut some_pool = short::Pool::<u32>::new();
-    let sym = some_pool.intern("abc").unwrap();
+fn resolve_unchecked() -> Result<()> {
+    //` id=resolve_unchecked {
+    let mut pool = Pool::<str, u8>::new();
+    let sym = try!(pool.intern("abc"));
 
-    //` id=resolve_ref-with-error-handling {
-    let s = match some_pool.resolve_ref(&sym) {
-        Ok(s) => s,
-        Err(err) => return Err(MyErrorType::from(err)),
-    };
+    assert_eq!("abc", unsafe { pool.resolve_unchecked(sym) });
     //` }
     Ok(())
 }

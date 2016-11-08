@@ -5,9 +5,9 @@
 // license <LICENSE-MIT or http://opensource.org/licenses/MIT>,
 // at your option. This file may not be copied, modified, or
 // distributed except according to those terms.
-//! String interner with configurable ID type, optimized for short strings.
+//! Interner adaptor with configurable ID type, optimized for short strings.
 //!
-//! [`Pool`], the interner type implemented in this module, will encode any
+//! [`Inline`], the interner type implemented in this module, will encode any
 //! string _shorter_ than the symbol-ID type *directly inside the symbol*;
 //! strings of the same or greater size will be passed to some unspecified
 //! back-end implementation.
@@ -24,17 +24,19 @@
 //! your input to be dominated by short strings.
 //!
 //! ```rust file="examples/short.rs"
-//! use symtern::traits::*;
+//! use symtern::prelude::*;
+//! use symtern::Pool;
+//! use symtern::adaptors::Inline;
 //!
-//! let mut pool = symtern::short::Pool::<u64>::new();
+//! let mut pool = Inline::<Pool<str,u64>>::new();
 //! let hello = pool.intern("Hello").expect("failed to intern a value");
 //! let world = pool.intern("World").expect("failed to intern a value");
 //!
 //! assert!(hello != world);
 //!
 //! assert_eq!((Ok("Hello"), Ok("World")),
-//!            (pool.resolve_ref(&hello),
-//!             pool.resolve_ref(&world)));
+//!            (pool.resolve(&hello),
+//!             pool.resolve(&world)));
 //!
 //! // Since both "Hello" and "World" are short enough to be inlined, they
 //! // don't take up any space in the pool.
@@ -45,16 +47,17 @@
 //! implemented for `u16`, `u32`, and `u64`; it will be implemented for `u128`
 //! as well when support for [128-bit integers] lands.
 //!
-//! [`Pool`]: struct.Pool.html
+//! [`Inline`]: struct.Inline.html
 //! [`basic::Pool`]: ../basic/struct.Pool.html
 //! [128-bit integers]: https://github.com/rust-lang/rfcs/blob/master/text/1504-int128.md
 //!
 use std::{mem, str};
 
-use traits::{InternerMut, Len, Resolve, ResolveRef, SymbolId};
+use num_traits::ToPrimitive;
+
+use traits::{Intern, Resolve, Len, SymbolId};
 use {ErrorKind, Result};
-use basic;
-use sym::{Symbol as ISymbol, Pool as IPool};
+use sym::{self, Symbol};
 
 /// Interface used to pack strings into symbol-IDs.  Any implementations of
 /// this trait *must* store inlined-string length in the most-significant
@@ -148,38 +151,83 @@ impl_pack!(u32, 4);
 impl_pack!(u64, 8);
 
 
-make_sym! {
-    pub Sym<I: Pack>(basic::Sym<I>):
-    "Symbol type used by the [`short` module](index.html)'s [`InternerMut`](../traits/trait.InternerMut.html) implementation.";
+/// Symbol type used by the [`short` module](index.html)'s
+/// [`Intern`](../traits/trait.Intern.html) implementation.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Sym<S> {
+    wrapped: S
+}
+
+impl<S> sym::Symbol for Sym<S>
+    where S: sym::Symbol
+{
+    type Id = S::Id;
+
+    #[cfg(debug_assertions)]
+    fn pool_id(&self) -> ::sym::PoolId {
+        self.wrapped.pool_id()
+    }
+
+    fn id(&self) -> Self::Id { self.wrapped.id() }
+    fn id_ref(&self) -> &Self::Id { self.wrapped.id_ref() }
+
+    #[cfg(not(debug_assertions))]
+    fn create(id: Self::Id) -> Self {
+        Sym{wrapped: <S as ::sym::Symbol>::create(id)}
+    }
+
+    #[cfg(debug_assertions)]
+    fn create(id: Self::Id, pool_id: ::sym::PoolId) -> Self {
+        Sym{wrapped: <S as ::sym::Symbol>::create(id, pool_id)}
+    }
+}
+
+impl<S> From<S> for Sym<S> {
+    fn from(s: S) -> Self {
+        Sym{wrapped: s}
+    }
 }
 
 /// Interner optimized for short strings.
 ///
 /// See [the module-level documentation](index.html) for more information.
-pub struct Pool<I>
-    where I: SymbolId
-{
-    backend: basic::Pool<str, I>
+#[derive(Copy, Clone, Debug)]
+pub struct Inline<W> {
+    wrapped: W
 }
 
-impl<I> Pool<I>
-    where I: SymbolId
-{
+impl<W> Inline<W> {
     /// Create a new, empty symbol pool
-    pub fn new() -> Self {
-        Pool{backend: basic::Pool::new()}
+    pub fn new() -> Self
+        where W: Default
+    {
+        Default::default()
     }
 }
 
-impl<B> Len for Pool<B>
-    where B: Len,
-          B::Symbol: sym::Symbol,
-          <B::Symbol as sym::Symbol>::Id: Pack + ToPrimitive
+impl<W> Default for Inline<W>
+    where W: Default
+{
+    fn default() -> Self {
+        Inline{wrapped: Default::default()}
+    }
+}
+
+
+impl<W> From<W> for Inline<W> {
+    fn from(w: W) -> Self {
+        Inline{wrapped: w}
+    }
+}
+
+impl<W> Len for Inline<W>
+    where W: Len + ::sym::Pool,
+          <<W as sym::Pool>::Symbol as sym::Symbol>::Id: Pack + ToPrimitive
 {
     /// Fetch the number of items contained in the pool.  The returned value
     /// does not count values inlined in symbols.
     fn len(&self) -> usize {
-        self.backend.len()
+        (&self.wrapped).len()
     }
 
     /// Check if the pool is "empty", i.e. has zero stored values.
@@ -187,97 +235,127 @@ impl<B> Len for Pool<B>
     /// Because strings inlined in symbols are not stored in the pool, they do
     /// not affect the result of this method.
     fn is_empty(&self) -> bool {
-        self.backend.is_empty()
+        (&self.wrapped).is_empty()
     }
 
     /// Check if the number of interned symbols has reached the maximum allowed
     /// for the pool's ID type.
     fn is_full(&self) -> bool {
-        self.backend.len() >= <<B::Symbol as sym::Symbol>::Id as Pack>::msb_mask().to_usize().unwrap()
+        (&self.wrapped).len() >= <<<W as sym::Pool>::Symbol as sym::Symbol>::Id as Pack>::msb_mask().to_usize().unwrap()
     }
 }
 
-impl<I> ::sym::Pool for Pool<I>
-    where I: SymbolId + Pack
+impl<W> ::sym::Pool for Inline<W>
+    where W: sym::Pool,
+          <<W as sym::Pool>::Symbol as sym::Symbol>::Id: Pack,
 {
+    type Symbol = W::Symbol;
+
     #[cfg(debug_assertions)]
     fn id(&self) -> ::sym::PoolId {
-        self.backend.id()
+        self.wrapped.id()
     }
 
-    type Symbol = <Self as InternerMut<str>>::Symbol;
-    fn create_symbol(&self, id: <Self::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
-        self.backend.create_symbol(id).into()
+    fn create_symbol(&self, id: <<W as sym::Pool>::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
+        <W as sym::Pool>::create_symbol(&self.wrapped, id).into()
     }
 }
 
 
-impl<I> InternerMut<str> for Pool<I>
-    where I: SymbolId + Pack
-{
-    type Symbol = Sym<I>;
+macro_rules! impl_intern {
+    ($($mutt: tt)*) => {
+        impl<'a, W, WS> Intern for &'a $($mutt)* Inline<W>
+            where W: Len + sym::Pool<Symbol=WS>,
+                  &'a $($mutt)* W: Intern<Input=str,Symbol=<W as sym::Pool>::Symbol>,
+                  WS: sym::Symbol,
+                  WS::Id: Pack
+        {
+            type Input = str;
+            type Symbol = Sym<WS>;
 
-    fn intern(&mut self, s: &str) -> Result<Self::Symbol> {
-        match I::pack(s) {
-            Some(id) => Ok(self.create_symbol(id)),
-            None => {
-                if self.is_full() {
-                    Err(ErrorKind::PoolOverflow.into())
-                } else {
-                    match self.backend.intern(s) {
-                        Ok(b) => Ok(b.into()),
-                        Err(e) => Err(e)
+            fn intern(self, s: &Self::Input) -> Result<Self::Symbol> {
+                match WS::Id::pack(s) {
+                    Some(id) => Ok(Sym{wrapped: self.wrapped.create_symbol(id)}),
+                    None => {
+                        // since max capacity is changed by this adaptor, we
+                        // need to do a capacity-check here.
+                        if self.is_full() {
+                            Err(ErrorKind::PoolOverflow.into())
+                        } else {
+                            match self.wrapped.intern(s) {
+                                Ok(b) => Ok(b.into()),
+                                Err(e) => Err(e)
+                            }
+                        }
                     }
                 }
             }
         }
     }
 }
+impl_intern!();
+impl_intern!(mut);
 
 
-impl<I> ResolveRef<Sym<I>> for Pool<I>
-    where I: SymbolId + Pack
+impl<'a, W, WS> Resolve for &'a Inline<W>
+    where for<'b> &'b W: Resolve<Input=WS, Output=&'b str>,
+          WS: 'a + sym::Symbol,
+          WS::Id: Pack + SymbolId,
 {
-    type Target = str;
-    fn resolve_ref<'a, 'b, 'c>(&'a self, symbol: &'b Sym<I>) -> Result<&'c Self::Target>
-        where 'a: 'c,
-              'b: 'c
+    type Input = &'a Sym<WS>;
+    type Output = &'a str;
+
+    fn resolve(self, symbol: Self::Input) -> Result<Self::Output>
     {
         match symbol.id_ref().get_packed_ref() {
             Some(s) => Ok(s),
-            None => self.backend.resolve(symbol.wrapped)
+            None => self.wrapped.resolve(symbol.wrapped)
         }
     }
 }
 
+
 #[cfg(test)]
 mod tests {
-    use super::{Pool, Pack};
+    use super::{Inline, Pack};
     use sym::Symbol;
-    use traits::{InternerMut, ResolveRef};
+    use traits::{Intern, Resolve, Len};
 
     /// Check that the pool's size is affected only by non-inlined values.
     #[test]
     fn inlined_values_do_not_affect_size() {
-        let mut pool = Pool::<u16>::new();
+        let mut pool = Inline::<::basic::Pool<str,u16>>::new();
         assert!(pool.is_empty());
 
         // Inlined values shouldn't contribute to the pool's size.
         let x = pool.intern("x").expect("failed to intern single-character string");
         assert_eq!(0, pool.len());
         assert!(x.id().is_inlined());
-        assert_eq!(Ok("x"), pool.resolve_ref(&x));
+        assert_eq!(Ok("x"), pool.resolve(&x));
 
         let xy = pool.intern("xy").expect("failed to intern two-character string");
         assert_eq!(1, pool.len());
         assert!(! xy.id().is_inlined());
-        assert_eq!(Ok("xy"), pool.resolve_ref(&xy));
+        assert_eq!(Ok("xy"), pool.resolve(&xy));
     }
+
+    /*/// Check that we can stack short::Pool adaptors and still resolve through
+    /// them.  This is a compile-time check:  we're verifying that the Resolve
+    /// implementation works whether the wrapped pool takes its `resolve`
+    /// argument by value *or* by reference.
+    /// 
+    /// Currently broken! :)
+    #[test]
+    fn can_stack_inliners() {
+        let mut pool = Inline::<Inline<::basic::Pool<str,u16>>>::new();
+        let xy = pool.intern("xy").expect("failed to intern two-character string");
+        assert_eq!(Ok("xy"), pool.resolve(&xy));
+    }*/
 
     /*/// Check that a `short` pool reports itself as full at the expected size.
     #[test]
     fn has_expected_capacity() {
-        // FIXME: [bug] To fill the minimum-capacity pool (Pool<u16>) to
+        // FIXME: [bug] To fill the minimum-capacity pool (Inline<Pool<str,u16>) to
         // capacity, we need to generate 32768 unique string values of length
         // two or greater; it sure would be nice if we could find a crate to
         // help with this.

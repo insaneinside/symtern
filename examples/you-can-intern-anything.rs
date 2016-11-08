@@ -9,7 +9,8 @@
 //! other words, you can intern *anything* that implements `Eq`, `Hash`, and
 //! `ToOwned`.  Let's try it!
 extern crate symtern;
-use symtern::traits::*;
+use symtern::prelude::*;
+use symtern::Pool;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct WibbleWobble {
@@ -17,6 +18,6 @@ struct WibbleWobble {
 }
 
 fn main() {
-    let mut pool = symtern::basic::Pool::<_,u8>::new();
+    let mut pool = Pool::<_,u8>::new();
     assert!(pool.intern(&WibbleWobble{whee: vec![1, 2, 3, 4, 5]}).is_ok());
 }

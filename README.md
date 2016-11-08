@@ -13,20 +13,15 @@ by identity only.
 
 As we would expect, interning works well with string types.
 
-```rust file="examples/intro.rs"
+```rust file="examples/intro.rs" id="basic"
 // Import Symtern's traits, which allow us to use each interner the same way
 // regardless of the underlying implementation.
-use symtern::traits::*;
-
-// We'll use the "basic" interner, which is generic over both the interned
-// value-type and the primitive type used to represent symbols.
-use symtern::basic::Pool;
+use symtern::prelude::*;
 
 // Create a new pool that accepts `&str` arguments to `intern`, and uses
 // `u8` as the backing representation for its symbol type.
-let mut pool = Pool::<str,u8>::new();
+let mut pool = symtern::Pool::<str,u8>::new();
 if let (Ok(hello), Ok(world)) = (pool.intern("Hello"), pool.intern("World")) {
-
     assert!(hello != world);
 
     assert_eq!(hello, hello);
@@ -46,8 +41,8 @@ a finite range of values; because of this you must allow for the possibility
 that any attempt to intern a value may fail.
 
 ```rust file="examples/error-handling.rs" id="overflow"
-use symtern::traits::*;
-use symtern::basic::Pool;
+use symtern::prelude::*;
+use symtern::Pool;
 use symtern::ErrorKind;
 
 // Here we create a pool that uses `u8` as the backing representation for its

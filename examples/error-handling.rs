@@ -8,8 +8,8 @@
 //! Examples of errors and error handling when working with Symtern.
 extern crate symtern;
 
-use symtern::traits::*;
-use symtern::basic::Pool;
+use symtern::prelude::*;
+use symtern::Pool;
 use symtern::ErrorKind;
 
 fn main() {

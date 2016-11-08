@@ -13,18 +13,32 @@ use traits::{self, SymbolId};
 /// Type that will be used for `Pool::Id` in all generated `Pool` impls.
 pub type PoolId = usize;
 
+/// Types used by interner implementations.
+pub trait Types {
+    /// Symbol type associated with the pool; this should be the same as the
+    /// associated type of the same name in any `Interner` implementations.
+    type Symbol: Symbol;
+
+    /// Input accepted by reference as an argument to `intern` on `Interner` or
+    /// `InternerMut`.
+    type Input: ?Sized;
+
+    /// Value returned by reference in the result from `resolve` on `Resolve`,
+    /// `resolve_ref` on `ResolveRef`, or `resolve_unchecked` on
+    /// `ResolveUnchecked`.
+    type Output: ?Sized;
+}
 
 /// Internal trait for Pool types that provides a consistent symbol-creation
 /// interface regardless of whether or not the crate is compiled in debug mode.
 pub trait Pool {
+    /// Symbol type associated with the pool; this should be the same as the
+    /// associated type of the same name in any `Interner` implementations.
+    type Symbol: Symbol;
+
     /// Fetch the pool's ID.
     #[cfg(debug_assertions)]
     fn id(&self) -> PoolId;
-
-    /// Symbol type associated with the pool; this should be the same as the
-    /// associated type of the same name in its `Interner` or
-    /// `InternerMut` implementation.
-    type Symbol: Symbol;
 
     /// Create a symbol with the specified symbol ID.
     fn create_symbol(&self, id: <Self::Symbol as Symbol>::Id) -> Self::Symbol;
@@ -55,10 +69,27 @@ pub trait Symbol: traits::Symbol {
     fn create(id: Self::Id) -> Self;
 }
 
+impl<'a, T> Types for &'a T
+    where T: Types
+{
+    type Symbol = T::Symbol;
+    type Input = T::Input;
+    type Output = T::Output;
+}
+
+impl<'a, T> Types for &'a mut T
+    where T: Types
+{
+    type Symbol = T::Symbol;
+    type Input = T::Input;
+    type Output = T::Output;
+}
+
 /// Define an opaque type constructor wrapping an underlying primitive ID, or
-/// other symbol type, to be used as a symbol type.  The mandatory type
-/// parameter is automatically bounded by [`traits::SymbolId`], and its
-/// instance is available via the private `id` field.
+/// other symbol type, to be used as a symbol type.  When wrapping a primitive
+/// ID type, the mandatory type parameter is automatically bounded by
+/// [`traits::SymbolId`], and its instance is available via the private
+/// `id` field.
 ///
 /// Basic usage (wrapping primitive ID types):
 ///
@@ -75,7 +106,7 @@ pub trait Symbol: traits::Symbol {
 ///
 /// ```rust,ignore
 /// make_sym! {
-///     pub WrapperSym<I>(MySym<I>): "Wraps MySym<I> for extra hugs.";
+///     pub WrapperSym<W>(W): "Wraps `W` for extra hugs.";
 /// }
 /// ```
 macro_rules! make_sym {
@@ -84,9 +115,10 @@ macro_rules! make_sym {
     // @impl for wrapped symbol types
     (@impl $name:ident < $I: ident > ( $wrapped: path ) ; $($bound: tt)+ ) => {
         impl<$I> ::sym::Symbol for $name<$I>
-            where $I: $($bound)+
+            where $I: $($bound)+,
+                  $wrapped: ::sym::Symbol
         {
-            type Id = $I;
+            type Id = <$wrapped as ::sym::Symbol>::Id;
 
             #[cfg(debug_assertions)]
             fn pool_id(&self) -> ::sym::PoolId {

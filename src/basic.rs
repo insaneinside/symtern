@@ -5,35 +5,13 @@
 // license <LICENSE-MIT or http://opensource.org/licenses/MIT>,
 // at your option. This file may not be copied, modified, or
 // distributed except according to those terms.
-//! Simple hash-based interner generic over both the type of interned values
-//! and the type used to represent symbol IDs.
-//!
-//! Symbols produced by the interner type in this module may outlive the
-//! interners that produced them; any attempt to resolve such symbols on
-//! a different interner will return an error.
-//!
-//! [`Pool`] can intern any type that implements `ToOwned`, `Eq`, and `Hash`,
-//! where its owned type (`ToOwned::Owned`) also implements `Eq` and `Hash`.
-//!
-//! ```rust file="examples/you-can-intern-anything.rs"
-//! use symtern::traits::*;
-//!
-//! #[derive(Clone, Eq, PartialEq, Hash)]
-//! struct WibbleWobble {
-//!     whee: Vec<u32>
-//! }
-//!
-//! let mut pool = symtern::basic::Pool::<_,u8>::new();
-//! assert!(pool.intern(&WibbleWobble{whee: vec![1, 2, 3, 4, 5]}).is_ok());
-//! ```
-//!
-//! [`Pool`]: struct.Pool.html
-//! [`InternerMut`]: ../traits/trait.InternerMut.html
+//! Basic hash-based generic interner.
+
 use std::hash::Hash;
 use std::borrow::{Borrow, ToOwned};
 #[cfg(debug_assertions)] use std::sync::atomic::{self, AtomicUsize, Ordering};
 
-use traits::{InternerMut, Len, SymbolId, Resolve, ResolveUnchecked};
+use traits::{Intern, Resolve, ResolveUnchecked, Len, SymbolId};
 use {core, Result, ErrorKind};
 use sym::{Symbol as ISymbol, Pool as IPool};
 
@@ -50,14 +28,28 @@ type HashMap<K, V> = ::std::collections::HashMap<K, V>;
 
 make_sym! {
     pub Sym<I>:
-    "Symbol type used by [the `basic` module](index.html)'s [`InternerMut`](../traits/trait.InternerMut.html) implementation.";
+    "Symbol type used by [`Pool`](struct.Pool.html)'s [`Intern`](../traits/trait.Intern.html) and [`Resolve`](../traits/trait.Resolve.html) implementations.";
 }
 
-/// Simple hash-based interner generic over interned type and with support for
-/// configurable symbol ID type.
+/// Simple hash-based interner generic over both the type of interned values
+/// and the type used to represent symbol IDs.
 ///
-/// See [the module-level documentation](index.html) for more information.
-#[derive(Clone, Debug)]
+/// `Pool` can intern any type that implements `ToOwned`, `Eq`, and `Hash`,
+/// where its owned type (`ToOwned::Owned`) also implements `Eq` and `Hash`.
+///
+/// ```rust file="examples/you-can-intern-anything.rs"
+/// use symtern::prelude::*;
+/// use symtern::Pool;
+///
+/// #[derive(Clone, Eq, PartialEq, Hash)]
+/// struct WibbleWobble {
+///     whee: Vec<u32>
+/// }
+///
+/// let mut pool = Pool::<_,u8>::new();
+/// assert!(pool.intern(&WibbleWobble{whee: vec![1, 2, 3, 4, 5]}).is_ok());
+/// ```
+#[derive(Debug)]
 pub struct Pool<T: ?Sized, I = usize>
     where T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash,
@@ -67,6 +59,24 @@ pub struct Pool<T: ?Sized, I = usize>
     lookup_vec: Vec<T::Owned>,
     #[cfg(debug_assertions)]
     pool_id: usize
+}
+
+impl<T: ?Sized, I> Clone for Pool<T, I>
+    where T: ToOwned + Eq + Hash,
+          T::Owned: Eq + Hash + Clone,
+          I: SymbolId,
+{
+    #[cfg(debug_assertions)]
+    fn clone(&self) -> Self {
+        Pool{ids_map: self.ids_map.clone(),
+             lookup_vec: self.lookup_vec.clone(),
+             pool_id: self.pool_id}
+    }
+    #[cfg(not(debug_assertions))]
+    fn clone(&self) -> Self {
+        Pool{ids_map: self.ids_map.clone(),
+             lookup_vec: self.lookup_vec.clone()}
+    }
 }
 
 // (inherent impl)
@@ -81,7 +91,7 @@ impl<T: ?Sized, I> Pool<T, I>
     }
 }
 
-impl<T: ?Sized, I> Len for Pool<T, I>
+impl<'a, T: ?Sized, I> Len for Pool<T, I>
     where T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash,
           I: SymbolId
@@ -106,17 +116,18 @@ impl<T: ?Sized, I> Len for Pool<T, I>
     }
 }
 
-impl<T: ?Sized, I> ::sym::Pool for Pool<T, I>
+impl<'a, T: ?Sized, I> ::sym::Pool for Pool<T, I>
     where T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash,
           I: SymbolId
 {
+    type Symbol = Sym<I>;
+
     #[cfg(debug_assertions)]
     fn id(&self) -> ::sym::PoolId {
         self.pool_id
     }
 
-    type Symbol = <Self as InternerMut<T>>::Symbol;
     #[cfg(not(debug_assertions))]
     fn create_symbol(&self, id: <Self::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
         Sym::create(id)
@@ -147,15 +158,16 @@ impl<T: ?Sized, I> Default for Pool<T, I>
     }
 }
 
-// InternerMut
-impl<T: ?Sized, I> InternerMut<T> for Pool<T, I>
+// Intern
+impl<'a, T: ?Sized, I> Intern for &'a mut Pool<T, I>
     where I: SymbolId,
           T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash + Borrow<T>,
 {
+    type Input = T;
     type Symbol = Sym<I>;
 
-    fn intern(&mut self, value: &T) -> Result<Self::Symbol> {
+    fn intern(mut self, value: &Self::Input) -> Result<Self::Symbol> {
         let key = core::hash::<T, core::DefaultHashAlgo>(value);
         if let Some(&id) = self.ids_map.get(&key) {
             return Ok(self.create_symbol(id))
@@ -194,14 +206,15 @@ macro_rules! check_matching_pool {
 
 // ----------------------------------------------------------------
 // Resolve
-impl<T: ?Sized, I> Resolve<<Pool<T, I> as InternerMut<T>>::Symbol> for Pool<T, I>
+impl<'a,T: ?Sized, I> Resolve for &'a Pool<T, I>
     where T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash + Borrow<T>,
           I: SymbolId
 {
-    type Target = T;
+    type Input = <&'a mut Pool<T, I> as Intern>::Symbol;
+    type Output = &'a T;
 
-    fn resolve(&self, s: <Self as InternerMut<T>>::Symbol) -> Result<&Self::Target> {
+    fn resolve(self, s: Self::Input) -> Result<Self::Output> {
         check_matching_pool!(self, s);
         // We previously converted the ID _from_ a usize, so this conversion should _not_ fail.
         let idx = s.id().to_usize().expect("Unexpected failure to convert symbol ID to usize");
@@ -213,12 +226,12 @@ impl<T: ?Sized, I> Resolve<<Pool<T, I> as InternerMut<T>>::Symbol> for Pool<T, I
         }
     }
 }
-impl<T: ?Sized, I> ResolveUnchecked<<Pool<T, I> as InternerMut<T>>::Symbol> for Pool<T, I>
+impl<'a, T: ?Sized, I> ResolveUnchecked for &'a Pool<T, I>
     where T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash + Borrow<T>,
           I: SymbolId
 {
-    unsafe fn resolve_unchecked(&self, symbol: <Pool<T, I> as InternerMut<T>>::Symbol) -> &Self::Target {
+    unsafe fn resolve_unchecked(self, symbol: Self::Input) -> Self::Output {
         let idx = symbol.id().to_usize().expect("Unexpected failure to convert symbol ID to usize");
         self.lookup_vec.get_unchecked(idx).borrow()
     }

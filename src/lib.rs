@@ -7,34 +7,55 @@
 // distributed except according to those terms.
 //! # Fast general-purpose interners for every use case
 //!
-//! Symtern provides high-performance interners applicable to most use cases
-//! (because let's face it: it's one of the least exciting parts of writing
-//! a parser).
+//! Symtern provides a high-performance interner implementation applicable to
+//! most use cases, and a small set of adaptors that add additional
+//! functionality on top of this base implementation.
 //!
-//!   * [`basic`] is generic over the type of interned values, and can be
-//!     configured to use any of Rust's numeric primitives for symbol IDs.
-//!     It is the recommended interner for most purposes.
+//! ## Trait-guided implementation
 //!
-//!   * [`short`] is optimized for short strings, which are stored directly in
-//!     the returned symbol when under a certain length.  If you expect to be
-//!     working with many short strings, it may perform better than the
-//!     `basic` interner.
+//! Symtern's types are implemented around a core set of traits that define the
+//! ways you can interact with an interner; these traits are carefully designed
+//! to allow the adaptor
 //!
+//! ## Interners and adaptors
 //!
-//! Each of these modules defines a `Pool` type that implements
-//! [`traits::InternerMut`].
+//! The base interner, [`Pool`], is generic over the type of interned values,
+//! and can be configured to use any of Rust's numeric primitives for symbol
+//! IDs.  It is the recommended interner for most purposes.
 //!
-//! For a more detailed introduction to the concepts and terminology used in
-//! the library, visit [the `traits` module].
+//! ```rust file="examples/intro.rs" id="basic"
+//! // Import Symtern's traits, which allow us to use each interner the same way
+//! // regardless of the underlying implementation.
+//! use symtern::prelude::*;
 //!
-//! ## Examples
+//! // Create a new pool that accepts `&str` arguments to `intern`, and uses
+//! // `u8` as the backing representation for its symbol type.
+//! let mut pool = symtern::Pool::<str,u8>::new();
+//! if let (Ok(hello), Ok(world)) = (pool.intern("Hello"), pool.intern("World")) {
+//!     assert!(hello != world);
+//!
+//!     assert_eq!(hello, hello);
+//!     assert_eq!(Ok(hello), pool.intern("Hello"));
+//!     assert_eq!(Ok("Hello"), pool.resolve(hello));
+//!
+//!     assert_eq!(world, world);
+//!     assert_eq!(Ok(world), pool.intern("World"));
+//!     assert_eq!(Ok("World"), pool.resolve(world));
+//! }
+//! ```
+//!
+//! ### Adaptors
+//!
+//! For an overview of the available adaptors, see the [`adaptors` module].
+//!
+//! ## More examples
 //!
 //! [Symbol types](traits/trait.Symbol.html) are `Copy`:  they can be passed by
 //! value without resulting in a move.
 //!
 //! ```rust file="examples/symbols-are-copy.rs" preserve=["main"]
-//! use symtern::basic::Pool;
-//! use symtern::traits::*;
+//! use symtern::prelude::*;
+//! use symtern::Pool;
 //!
 //! /// Take ownership of a value, consuming it.
 //! fn consume<T>(_: T) {}
@@ -64,20 +85,21 @@
 //! all symbol instances to allow run-time detection of attempts to resolve
 //! a symbol on the wrong resolver, and any such attempt will trigger a panic.
 //!
-//! [`traits::InternerMut`]: traits/trait.InternerMut.html
-//! [`basic`]: basic/index.html
-//! [`short`]: short/index.html
-//! [the `traits` module]: traits/index.html
+//! [`Pool`]: struct.Pool.html
+//! [`adaptors::Inline`]: adaptors/struct.Inline.html
+//! [`traits` module]: traits/index.html
 #![warn(missing_docs)]
-
 extern crate num_traits;
 #[cfg(feature = "fnv")] extern crate fnv;
 
 #[macro_use] mod sym;
 mod core;
 mod error;
+
 pub mod traits;
-pub mod short;
-pub mod basic;
+mod basic;
+pub mod adaptors;
+pub mod prelude;
 
 pub use error::{Result, Error, ErrorKind};
+pub use basic::{Pool, Sym};

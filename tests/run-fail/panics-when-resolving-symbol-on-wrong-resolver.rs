@@ -8,8 +8,8 @@
 // error-pattern:Detected an invalid attempt to resolve a symbol
 #![cfg(debug_assertions)]
 extern crate symtern;
-use symtern::traits::*;
-use symtern::basic::Pool;
+use symtern::prelude::*;
+use symtern::Pool;
 
 fn main() {
     let mut p1 = Pool::<str,u16>::new();

@@ -21,40 +21,41 @@
 //!
 //! ## Symbol creation
 //!
-//! Symbols are created with the `intern` method on [`Interner`] or
-//! [`InternerMut`] implementations.  (At the present time, this crate contains
-//! only `InternerMut` implementations.)
+//! Symbols are created by calling [`intern`] on [`Intern`] implementations.
 //!
 //! ```rust file="examples/create-resolve.rs" id="create"
 //! // Nearly all functionality is in the trait implementations, so we simply
 //! // glob-import the traits.
-//! use symtern::traits::*;
+//! use symtern::prelude::*;
+//! use symtern::Pool;
+//! use symtern::adaptors::Inline;
 //!
-//! let mut basic_pool = symtern::basic::Pool::<str,u16>::new();
+//!
+//! let mut basic_pool = Pool::<str,u16>::new();
 //! let cat = basic_pool.intern("Kibbles").expect("Failed to intern the cat");
 //!
-//! let mut short_pool = symtern::short::Pool::<u64>::new();
-//! let dog = short_pool.intern("Fido").expect("Failed to intern the dog");
+//! let mut inline_pool = Inline::<Pool<str, u64>>::new();
+//! let dog = inline_pool.intern("Fido").expect("Failed to intern the dog");
 //! ```
 //!
 //! ## Symbol resolution
 //!
-//! The method used to resolve a symbol into its referent depends on the
-//! resolver trait implemented by a the interner being used.  With [`Resolve`]
-//! implementations, you simply call the interner's [`resolve`] method:
+//! Symbols are resolved using the [`Resolve`] trait.  In many cases you can
+//! simply pass the symbol to the interner's [`resolve`] method by value:
 //!
 //! ```rust,ignore file="examples/create-resolve.rs" id="resolve"
 //! assert_eq!(Ok("Kibbles"), basic_pool.resolve(cat));
 //! ```
 //!
-//! [`ResolveRef`] implementations, for whatever reason, instead of taking
-//! a symbol by value require a _reference_ to the symbol.  This trait's method
-//! is called [`resolve_ref`] to avoid potential confusion over the different
-//! syntax required when passing an argument.
+//! Some `Resolve` implementations, however, require a _reference_ to
+//! the symbol:
 //!
 //! ```rust,ignore file="examples/create-resolve.rs" id="resolve_ref"
-//! assert_eq!(Ok("Fido"), short_pool.resolve_ref(&dog));
+//! assert_eq!(Ok("Fido"), inline_pool.resolve(&dog));
 //! ```
+//!
+//! You can tell the difference by looking at the `Input` associated type on
+//! each `Resolve` implementation.
 //!
 //! ## <strike>Choosing</strike> Chasing our Guarantees
 //!
@@ -155,12 +156,11 @@
 //! [indexing] crate.
 //!
 //! [indexing]: https://github.com/bluss/indexing
-//! [`Interner`]: trait.Interner.html
+//! [`intern`]: trait.Intern.html#tymethod.intern
+//! [`Intern`]: trait.Intern.html
 //! [`InternerMut`]: trait.InternerMut.html
 //! [`Resolve`]: trait.Resolve.html
 //! [`resolve`]: trait.Resolve.html#tymethod.resolve
-//! [`ResolveRef`]: trait.ResolveRef.html
-//! [`resolve_ref`]: trait.ResolveRef.html#tymethod.resolve_ref
 //! [Scala's path-dependent types]: http://danielwestheide.com/blog/2013/02/13/the-neophytes-guide-to-scala-part-13-path-dependent-types.html
 use std::hash::Hash;
 use ::num_traits::{Bounded, Unsigned, FromPrimitive, ToPrimitive};
@@ -179,30 +179,14 @@ impl<T> Symbol for T where T: Copy + Eq + Hash {}
 
 // ----------------------------------------------------------------
 
-/// Primary interface for interner implementations that make use of
-/// interior mutability.
-///
-/// This trait is not currently used by any interner implemented in the crate,
-/// and may be removed prior to release; see the discussion
-/// [here](index.html#strikechoosingstrike-chasing-our-guarantees).
-pub trait Interner<'a, T: ?Sized> {
-    /// Type used to represent interned values.
-    type Symbol: 'a + Symbol;
+/// Primary interface for interner implementations.  For a given type `T`, this
+/// type should implemented for `&'a T` or `&'a mut T`.
+pub trait Intern {
+    /// Type of value accepted by `intern`.
+    type Input: ?Sized;
 
-    /// Fetch the symbol that corresponds to the given value.  If the value
-    /// does not map to any existing symbol, create and return a new one.
-    /// This method may return an error if the interner is out of space.
-    fn intern(&'a self, value: &T) -> Result<Self::Symbol>;
-}
-
-/// Primary interface for interner implementations.
-///
-/// This trait may be renamed to [`Interner`](trait.Interner.html) prior to
-/// release; see the discussion
-/// [here](index.html#strikechoosingstrike-chasing-our-guarantees).
-pub trait InternerMut<T: ?Sized> {
     /// Type used to represent interned values.
-    type Symbol: Symbol;
+    type Symbol: Symbol + ::sym::Symbol;
 
     /// Fetch the symbol that corresponds to the given value.  If the value
     /// does not map to any existing symbol, create and return a new one.
@@ -215,16 +199,18 @@ pub trait InternerMut<T: ?Sized> {
     ///     Err(err) => return Err(MyErrorType::from(err)),
     /// };
     /// ```
-    fn intern(&mut self, value: &T) -> Result<Self::Symbol>;
+    fn intern(self, value: &Self::Input) -> Result<Self::Symbol>;
 }
 
 // ----------------------------------------------------------------
 
-/// Trait for implementation by interners that directly provide
-/// symbol resolution.
-pub trait Resolve<S: Symbol> {
+/// Trait used to resolve symbols back to
+pub trait Resolve {
+    /// Type used to represent interned values.
+    type Input;
+
     /// Type stored by the interner and made available with `resolve`.
-    type Target: ?Sized;
+    type Output;
 
     /// Look up and return a reference to the value represented by a symbol, or
     /// an error if the symbol was not found.
@@ -235,38 +221,23 @@ pub trait Resolve<S: Symbol> {
     ///     Err(err) => return Err(MyErrorType::from(err)),
     /// };
     /// ```
-    fn resolve(&self, symbol: S) -> Result<&Self::Target>;
+    fn resolve(self, symbol: Self::Input) -> Result<Self::Output>;
 }
 
 
 /// Interface for resolvers that can provide faster symbol resolution at the
 /// expense of guaranteed safety.
-pub trait ResolveUnchecked<S: Symbol>: Resolve<S> {
+pub trait ResolveUnchecked: Resolve {
     /// Resolve the given symbol into its referent, bypassing any
     /// validity checks.
-    unsafe fn resolve_unchecked(&self, symbol: S) -> &Self::Target;
-}
-
-
-
-/// Trait implemented by interners that require a reference to a symbol in
-/// order to resolve it.
-pub trait ResolveRef<S> where S: Symbol {
-    /// Type stored by the interner and made available with `resolve_ref`.
-    type Target: ?Sized;
-
-    /// Look up and return a reference to the value represented by a symbol, or
-    /// an error if the symbol was not found.
     ///
-    /// ```rust,ignore file="examples/create-resolve.rs" id="resolve_ref-with-error-handling"
-    /// let s = match some_pool.resolve_ref(&sym) {
-    ///     Ok(s) => s,
-    ///     Err(err) => return Err(MyErrorType::from(err)),
-    /// };
+    /// ```rust,ignore file="examples/create-resolve.rs" id="resolve_unchecked"
+    /// let mut pool = Pool::<str, u8>::new();
+    /// let sym = try!(pool.intern("abc"));
+    ///
+    /// assert_eq!("abc", unsafe { pool.resolve_unchecked(sym) });
     /// ```
-    fn resolve_ref<'a, 'b, 'c>(&'a self, symbol: &'b S) -> Result<&'c Self::Target>
-        where 'a: 'c,
-              'b: 'c;
+    unsafe fn resolve_unchecked(self, symbol: Self::Input) -> Self::Output;
 }
 
 
