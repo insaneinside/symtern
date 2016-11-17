@@ -6,12 +6,7 @@
 // at your option. This file may not be copied, modified, or
 // distributed except according to those terms.
 //! "Lifetime-safe" interner adaptor.
-//!
-//! The adaptor provided by this module wraps the underlying symbol pool in
-//! a `RefCell` to provide internal mutability; its symbols are treated as
-//! references to their source pool &mdash; which, thanks to Rust's
-//! borrow-checker, prevents us from having symbols without any means to
-//! resolve them.
+// [Module documentation lives on the exported adaptor, `Luma`.]
 use std::marker::PhantomData;
 use std::cell::{RefCell, Ref};
 
@@ -61,13 +56,13 @@ impl<'a,W> From<W> for Sym<'a, W> {
     }
 }
 
-/// Interner adaptor that utilizes interior mutability to implement the
-/// [`Intern`] trait.
+/// "Lifetime-safe" interner adaptor.
 ///
-/// See the [module-level documentation] for more information.
-///
-/// [module-level documentation]: index.html
-/// [`Intern`]: ../traits/trait.Intern.html
+/// The adaptor provided by this module wraps the underlying symbol pool in
+/// a `RefCell` to provide internal mutability; its symbols are treated as
+/// references to their source pool &mdash; which, thanks to Rust's
+/// borrow-checker, prevents us from having symbols without any means to
+/// resolve them.
 #[derive(Default)]
 pub struct Luma<W> {
     wrapped: RefCell<W>
