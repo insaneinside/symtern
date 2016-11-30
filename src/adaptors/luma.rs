@@ -58,11 +58,42 @@ impl<'a,W> From<W> for Sym<'a, W> {
 
 /// "Lifetime-safe" interner adaptor.
 ///
-/// The adaptor provided by this module wraps the underlying symbol pool in
-/// a `RefCell` to provide internal mutability; its symbols are treated as
-/// references to their source pool &mdash; which, thanks to Rust's
-/// borrow-checker, prevents us from having symbols without any means to
-/// resolve them.
+/// This adaptor's symbols are treated as references to their source pool
+/// &mdash; which, thanks to Rust's borrow-checker, prevents us from dropping
+/// the pool before any of its symbols.
+///
+/// To achieve this, we utilize interior mutability via `RefCell` (which allows
+/// us to intern more than one value at a time).  Note that this is _not_
+/// a zero-cost abstraction: the price we pay for interior mutability is
+/// run-time borrow-checking!  More specifically, certain borrow errors that
+/// would normally be caught at compile-time...
+///
+/// ```rust,compile_fail file="tests/compile-fail/cannot-intern-with-active-resolved-ref.rs"
+/// use symtern::prelude::*;
+/// use symtern::Pool;
+///
+/// let mut pool = Pool::<str, u32>::new();
+/// let x = pool.intern("foo").expect("failed to intern a value");
+/// let foo = pool.resolve(x).expect("failed to resolve the value we just interned");
+/// assert_eq!("foo", foo);
+///
+/// let _ = pool.intern("bar").expect("failed to intern a value"); //~ ERROR cannot borrow `pool` as mutable because it is also borrowed as immutable
+/// ```
+///
+/// ...become run-time errors when using the `Luma` adaptor:
+///
+/// ```rust,ignore file="tests/run-fail/luma-panics-on-intern-with-active-resolved-ref.rs"
+/// use symtern::prelude::*;
+/// use symtern::Pool;
+/// use symtern::adaptors::Luma;
+///
+/// let pool = Luma::from(Pool::<str, u32>::new());
+/// let x = pool.intern("foo").expect("failed to intern a value");
+/// let foo = pool.resolve(x).expect("failed to resolve the value we just interned");
+/// assert_eq!("foo", &*foo);
+///
+/// let _ = pool.intern("bar").expect("failed to intern a value"); //~ PANIC already borrowed: BorrowMutError
+/// ```
 #[derive(Default)]
 pub struct Luma<W> {
     wrapped: RefCell<W>

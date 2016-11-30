@@ -7,6 +7,11 @@
 // distributed except according to those terms.
 //! Internal helpers for creating and manipulating interned-value standins
 //! (symbols).
+//!
+//! The traits defined in this module should be used **only** when you are
+//! implementing your own interner or adaptor types.  Because they allow you to
+//! create symbols out of thin air and inspect implementation details, Bad
+//! Things™ are likely to happen if you use their methods in other contexts.
 
 use traits::{self, SymbolId};
 
@@ -40,12 +45,13 @@ pub trait Pool {
     #[cfg(debug_assertions)]
     fn id(&self) -> PoolId;
 
-    /// Create a symbol with the specified symbol ID.
-    fn create_symbol(&self, id: <Self::Symbol as Symbol>::Id) -> Self::Symbol;
+    /// Create a symbol with the specified ID.  Do **not** use this method
+    /// unless you are implementing a new symbol pool or adaptor type!
+    /// Any created symbol _must_ be resolvable on an existing pool.
+    fn create_symbol(self, id: <Self::Symbol as Symbol>::Id) -> Self::Symbol;
 }
 
-/// Interface presented by symbol types created with the
-/// [`make_sym`](macro.make_sym.html) macro.
+/// Interface used to extract internal ID values from symbols.
 pub trait Symbol: traits::Symbol {
     /// Primitive type underlying the symbol implementation.
     type Id: SymbolId;
@@ -64,7 +70,7 @@ pub trait Symbol: traits::Symbol {
     #[cfg(debug_assertions)]
     fn create(id: Self::Id, pool_id: PoolId) -> Self;
 
-    /// Create a new value with the given ID.
+    /// Create a new symbol with the given ID.
     #[cfg(not(debug_assertions))]
     fn create(id: Self::Id) -> Self;
 }

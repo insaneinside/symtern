@@ -1,7 +1,7 @@
 require_relative('parser')
 module Rust
   module R
-    @group_name = '_g0'
+    @group_name = '_a0'
     def self.gn()
       @group_name.succ!
     end
@@ -145,9 +145,13 @@ module Rust
     ELLIPSIS_COMMENT = comment(/\s*...\s*/)
 
 
+    def self.tag_string(s)
+      /#{s}|"#{s}"/
+    end
+
     TAG_ID = /[-a-zA-Z][-.a-zA-Z0-9]*/
     def self.id_tag(id = TAG_ID)
-      /id\s*=\s*#{id}/
+      /id\s*=\s*#{tag_string(id)}/
     end
 
     def self.tag_comment(tag)
@@ -182,8 +186,12 @@ module Rust
     end
   end
 
-  ExternCrateBase = ::Struct.new(:crate, :alias)
-  class ExternCrate < ExternCrateBase
+  class ExternCrate
+    attr_reader :crate, :alias
+    def initialize(crate, _alias = nil)
+      @crate = crate
+      @alias = _alias
+    end
     def effective_name
       if self.alias.nil?
         self.crate

@@ -29,7 +29,14 @@ PREFIXES = { '.rs' => %r{[ \t]*//[/!] ?},
              '.md' => %r{} }
 SUPPORTED_FILE_REGEXP = /\.(?:rs|md)\z/
 IGNORE_PATTERNS = /\A(?:\.|\.\.)\z|~\z/
-DEFAULT_CODE_CHUNK_ATTRS = { strip: ['inner-comments', 'license-header'] }
+
+DEFAULT_CODE_CHUNK_ATTRS = { strip: ['ignore-blocks',
+                                     'inner-comments',
+                                     'license-header',
+                                     'leading-blank-lines',
+                                     'trailing-blank-lines',
+                                     'contents-after-ellipsis-comments'] }
+
 LICENSE_HEADER_TEXT = File.read(File.join(__dir__, 'data', 'license-header.rs'))
 
 # Given the `block` submatch from a BLOCK_REGEXP match, return the part inside
@@ -78,6 +85,31 @@ def strip_block_contents_after_ellipsis_comments(s)
 end
 
 
+def strip!(output, what)
+  for item in what
+    case item
+    when 'leading-blank-lines'
+      output.sub!(/\A\n*/, '')
+    when 'trailing-blank-lines'
+      output.sub!(/\n*\z/, '')
+    when 'ignore-blocks', 'ignored-blocks'
+      output.gsub!(Rust::R::tagged_block(/\s*ignore\s*/), '')
+    when 'license-header'
+      output.sub!(LICENSE_HEADER_TEXT, '')
+    when 'inner-comments'
+      output.gsub!(Rust::R::INNER_COMMENT, '')
+    when 'main'
+      output.gsub!(Rust::R::fn('main'), '')
+    when 'contents-after-ellipsis-comments'
+      output.replace(strip_block_contents_after_ellipsis_comments(output))
+    else
+      raise "Unknown strip item: #{item}"
+    end
+  end
+end
+
+
+
 # Retrieve a code sample from a file, transforming it appropriately for an
 # idiomatic Rust code sample.  If `id` is non-`nil`, searches for and includes
 # only the named block (as tagged with a comment "//` id=#{id}" or
@@ -88,12 +120,7 @@ def fetch_external_code(attrs)
   tokens = Rust::Parser.parse_string(input)
   extern_crates = tokens.select { |tok| tok.type == :extern_crate }
 
-  ignore_block_regexp = Rust::R::tagged_block(/\s*ignore\s*/)
-  while ! (m = output.match(ignore_block_regexp)).nil?
-    output.slice!(m.begin(0)..m.end(0))
-  end
-
-  can_open_code_main = false
+  can_open_code_main = attrs.key?(:strip) && ! attrs[:strip].include?('main')
 
   # If there's only a single `extern crate` declaration, and it's the local
   # project and has not been aliased, expunge it.
@@ -102,28 +129,10 @@ def fetch_external_code(attrs)
     can_open_code_main = true unless attrs.fetch(:preserve, []).include?('main')
   end
 
+  main_fn = Rust::R.fn('main').match(input)
+
   # Strip various things
-  if attrs.key?(:strip)
-    for item in attrs.fetch(:strip, [])
-      case item
-      when 'license-header'
-        output.sub!(LICENSE_HEADER_TEXT, '')
-      when 'inner-comments'
-        output.gsub!(Rust::R::INNER_COMMENT, '')
-      when 'main'
-        can_open_code_main = true
-      else
-        raise "Unknown strip item: #{item}"
-      end
-    end
-  end
-
-  # Remove everything that follows an ellipsis comment inside a block
-  output = strip_block_contents_after_ellipsis_comments(output)
-
-  if (main_fn = Rust::R.fn('main').match(input)).nil?
-    raise 'Failed to find `main` in %s' % attrs[:file]
-  end
+  strip!(output, attrs[:strip] || [])
 
   if attrs.key?(:id)
     id_tag = Rust::R::id_tag(attrs[:id])
@@ -146,12 +155,46 @@ end
 class TextChunk < String
 end
 class CodeChunk
+  # Contents of the code chunk -- the actual code, with prefix comments and
+  # opening/closing lines removed.
+  #
+  # @!attribute [r]
+  #   @return [String]
   attr_reader :content
+
+  # Attributes specified on the code chunk's opening line. Per the CommonMark
+  # spec, the first word after the opening fence has been assigned to the
+  # `:language` attribute.
+  #
+  # @!attribute [r]
+  #   @return [Hash<Symbol,Object>]
   attr_reader :attributes
+
+  # Common prefix found on all lines of the original code block.
+  #
+  # @!attribute [r]
+  #   @return [String]
   attr_reader :prefix
+
+  # Raw code block, including all prefixes, opening and closing lines, etc.
+  #
+  # @!attribute [r]
+  #   @return [String]
   attr_reader :orig
+
+  # Opening line of the raw code block, including prefix, code fence, and any
+  # attributes.
+  #
+  # @!attribute [r]
+  #   @return [String]
   attr_reader :open_line
+
+  # Closing line of the raw code block, including prefix and code fence.
+  #
+  # @!attribute [r]
+  #   @return [String]
   attr_reader :close_line
+
   def initialize(content:, file:, line:,
                  open_line:, close_line:,
                  orig:,
@@ -171,11 +214,12 @@ class CodeChunk
                @attributes.reject { |k,_| k == :language }.map  { |k, v| '%s=%s' % [k.to_s, v.inspect] }.join(' ')]
   end
 
+  # Fetch the code to be used for this block.  If the 
   def fetch_code()
     if @attributes.key?(:file)
       if (out = fetch_external_code(@attributes)).nil?
         $stderr.puts("Failed to load external code for code chunk at #{self.location_string}")
-        nil
+        @content
       else
         out
       end

@@ -106,9 +106,7 @@ impl_pack!(u16, 2);
 impl_pack!(u32, 4);
 impl_pack!(u64, 8);
 
-
-/// Symbol type used by the [`short` module](index.html)'s
-/// [`Intern`](../traits/trait.Intern.html) implementation.
+/// Symbol type used by the [`Inline`](struct.Inline.html) adaptor.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Sym<S> {
     wrapped: S
@@ -335,20 +333,18 @@ mod tests {
         assert_eq!(Ok("xy"), pool.resolve(&xy));
     }
 
-    /*/// Check that we can stack short::Pool adaptors and still resolve through
+    /// Check that we can stack Inline adaptors and still resolve through
     /// them.  This is a compile-time check:  we're verifying that the Resolve
     /// implementation works whether the wrapped pool takes its `resolve`
     /// argument by value *or* by reference.
-    /// 
-    /// Currently broken! :)
     #[test]
     fn can_stack_inliners() {
         let mut pool = Inline::<Inline<::basic::Pool<str,u16>>>::new();
         let xy = pool.intern("xy").expect("failed to intern two-character string");
         assert_eq!(Ok("xy"), pool.resolve(&xy));
-    }*/
+    }
 
-    /*/// Check that a `short` pool reports itself as full at the expected size.
+    /*/// Check that an `Inline` pool reports itself as full at the expected size.
     #[test]
     fn has_expected_capacity() {
         // FIXME: [bug] To fill the minimum-capacity pool (Inline<Pool<str,u16>) to

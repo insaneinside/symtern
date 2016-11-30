@@ -54,8 +54,8 @@
 //! assert_eq!(Ok("Fido"), inline_pool.resolve(&dog));
 //! ```
 //!
-//! You can tell the difference by looking at the `Input` associated type on
-//! each `Resolve` implementation.
+//! You can tell the difference by inspect the [`Input`][Resolve::Input]
+//! associated type on each [`Resolve`] implementation.
 //!
 //! ## <strike>Choosing</strike> Chasing our Guarantees
 //!
@@ -110,15 +110,13 @@
 //!     }
 //! }
 //!
-//! fn main() {
-//!     let mut interner = MyInterner::new();
-//!     let x = interner.intern("x");
-//!     let y = interner.intern("y");        //~ ERROR cannot borrow `interner` as mutable more than once at a time
-//! }
+//! let mut interner = MyInterner::new();
+//! let x = interner.intern("x");
+//! let y = interner.intern("y");        //~ ERROR cannot borrow `interner` as mutable more than once at a time
 //! ```
 //!
 //! This happens because rustc's borrowck sees that `intern` takes a mutable
-//! reference to the MyInterner instance and returns a symbol with the same
+//! reference to the `MyInterner` instance and returns a symbol with the same
 //! lifetime, and infers that this symbol has (mutably) borrowed the interner
 //! through the reference.  To fix this we can do one of the following.
 //!
@@ -158,9 +156,9 @@
 //! [indexing]: https://github.com/bluss/indexing
 //! [`intern`]: trait.Intern.html#tymethod.intern
 //! [`Intern`]: trait.Intern.html
-//! [`InternerMut`]: trait.InternerMut.html
 //! [`Resolve`]: trait.Resolve.html
 //! [`resolve`]: trait.Resolve.html#tymethod.resolve
+//! [Resolve::Input]: trait.Resolve.html#associatedtype.Input
 //! [Scala's path-dependent types]: http://danielwestheide.com/blog/2013/02/13/the-neophytes-guide-to-scala-part-13-path-dependent-types.html
 use std::hash::Hash;
 use ::num_traits::{Bounded, Unsigned, FromPrimitive, ToPrimitive};
@@ -179,8 +177,12 @@ impl<T> Symbol for T where T: Copy + Eq + Hash {}
 
 // ----------------------------------------------------------------
 
-/// Primary interface for interner implementations.  For a given type `T`, this
-/// type should implemented for `&'a T` or `&'a mut T`.
+/// Primary interface for interner implementations.
+///
+/// In order to allow for implementations that require a lifetime parameter,
+/// and to abstract over mutability requirements, this trait's methods take
+/// `self` by value; for a given type `T`, the trait should implemented for
+/// either `&'a T` or `&'a mut T`.
 pub trait Intern {
     /// Type of value accepted by `intern`.
     type Input: ?Sized;
@@ -204,9 +206,14 @@ pub trait Intern {
 
 // ----------------------------------------------------------------
 
-/// Trait used to resolve symbols back to
+/// Interface trait for types that provide the ability to resolve a symbol into
+/// its referent.
+///
+/// In order to allow for implementations that require a lifetime parameter,
+/// this trait's methods take `self` by value; for a given type `T`, the trait
+/// should implemented for `&'a T`.
 pub trait Resolve {
-    /// Type used to represent interned values.
+    /// Type passed to the [`resolve`](#tymethod.resolve) method.
     type Input;
 
     /// Type stored by the interner and made available with `resolve`.
@@ -227,6 +234,10 @@ pub trait Resolve {
 
 /// Interface for resolvers that can provide faster symbol resolution at the
 /// expense of guaranteed safety.
+///
+/// Like [`Resolve`], this trait's methods take `self` by value.
+///
+/// [`Resolve`]: trait.Resolve.html
 pub trait ResolveUnchecked: Resolve {
     /// Resolve the given symbol into its referent, bypassing any
     /// validity checks.
@@ -241,7 +252,8 @@ pub trait ResolveUnchecked: Resolve {
 }
 
 
-/// Trait for use with interners can report the number of values they contain.
+/// Trait for use with interners that can report the number of values
+/// they contain.
 pub trait Len {
     /// Fetch the number of values contained in the interner.
     fn len(&self) -> usize;

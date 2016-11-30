@@ -15,7 +15,7 @@
 //!
 //! Symtern's types are implemented around a core set of traits that define the
 //! ways you can interact with an interner; these traits are carefully designed
-//! to allow the adaptor
+//! to avoid restricting the kinds of adaptors possible.
 //!
 //! ## Interners and adaptors
 //!
@@ -60,12 +60,10 @@
 //! /// Take ownership of a value, consuming it.
 //! fn consume<T>(_: T) {}
 //!
-//! fn main() {
-//!     let mut pool = Pool::<str, u32>::new();
-//!     let sym = pool.intern("xyz").unwrap();
-//!     consume(sym);
-//!     println!("The symbol is still valid: {:?}", pool.resolve(sym));
-//! }
+//! let mut pool = Pool::<str, u32>::new();
+//! let sym = pool.intern("xyz").unwrap();
+//! consume(sym);
+//! println!("The symbol is still valid: {:?}", pool.resolve(sym));
 //! ```
 //!
 //! ## Caveat Emptor
@@ -86,7 +84,7 @@
 //! a symbol on the wrong resolver, and any such attempt will trigger a panic.
 //!
 //! [`Pool`]: struct.Pool.html
-//! [`adaptors::Inline`]: adaptors/struct.Inline.html
+//! [`adaptors` module]: adaptors/index.html
 //! [`traits` module]: traits/index.html
 #![warn(missing_docs)]
 extern crate num_traits;

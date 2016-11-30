@@ -17,8 +17,29 @@
 //! use symtern::{Pool, Sym};
 //! use symtern::adaptors::{Inline, InlineSym};
 //!
-//! type MyPool = symtern::adaptors::Inline<symtern::Pool<str,u32>>;
-//! type MySym = symtern::adaptors::InlineSym<symtern::Sym<u32>>;
+//! type MyPool = Inline<Pool<str,u32>>;
+//! type MySym = InlineSym<Sym<u32>>;
+//! ```
+//!
+//! ## Losing symbols
+//!
+//! If you construct an adaptor from an existing interner, you will lose access
+//! to all previously-created symbols:
+//!
+//! ```rust,compile_fail file="tests/compile-fail/losing-symbols.rs"
+//! use symtern::prelude::*;
+//! use symtern::Pool;
+//! use symtern::adaptors::Inline;
+//!
+//! // Once we've constructed an adaptor from an existing pool, we _cannot_
+//! // resolve previously-created symbols:
+//! let mut basic_pool = Pool::<str,u64>::new();
+//! let some_sym = basic_pool.intern("Mornin'!").expect("interning failed");
+//! // After we've created `inline_pool`, consuming `basic_pool`...
+//! let mut inline_pool = Inline::from(basic_pool);
+//! // ...we won't be able to resolve `some_sym` because its type is
+//! // incompatible with the inline pool's `resolve` method!
+//! println!("{}", inline_pool.resolve(&some_sym).expect("resolution failed")); //~ ERROR mismatched types [E0308]
 //! ```
 //!
 //! ## Inline
@@ -34,6 +55,7 @@
 //! use symtern::prelude::*;
 //! use symtern::adaptors::Inline;
 //! use symtern::Pool;
+//!
 //! let mut pool = Inline::from(Pool::<str,u64>::new());
 //!
 //! if let (Ok(hello), Ok(world)) = (pool.intern("Hello"), pool.intern("World")) {
@@ -55,11 +77,25 @@
 //! For example, the following code will not compile because it attempts to
 //! return a symbol from a temporary `Luma`-wrapped interner.
 //! 
-//! ```rust file="tests/compile-fail/luma-is-lifetime-safe.rs" id="example"
+//! ```rust,compile_fail file="tests/compile-fail/luma-is-lifetime-safe.rs" id="example"
+//! //` id="example" {
+//! use symtern::prelude::*;
+//! use symtern::{Pool as Basic, Sym};
+//! use symtern::adaptors::{Luma, LumaSym};
+//!
+//! type Pool = Luma<Basic<str, u32>>;
+//!
+//! /// Return a Sym from a temporary Luma-wrapped interner.  This causes a compile
+//! /// error because the interner, which is dropped at the end of the function, is
+//! /// referenced by the returned symbol.
+//! fn make_sym<'a>(s: &str) -> <&'a Pool as symtern::traits::Intern>::Output {
+//!     Pool::new().intern(s).unwrap() //~ ERROR borrowed value does not live long enough
+//! }
+//! //` }
 //! ```
 //!
 //! [`Luma`]: struct.Luma.html
-//! [`Inline]: struct.Inline.html
+//! [`Inline`]: struct.Inline.html
 
 mod inline;
 mod luma;
@@ -72,6 +108,7 @@ mod tests {
     use Pool;
     use super::{Inline, Luma};
 
+    // Check that we can use a `Inline ∘ Luma ∘ Pool` composition.
     #[test]
     fn can_inline_luma() {
         let inline: Inline<Luma<Pool<str, u64>>> = Inline::new();
@@ -82,6 +119,7 @@ mod tests {
         assert_eq!(Ok("y"), inline.resolve(&y));
     }
 
+    // Check that we can use a `Luma ∘ Inline ∘ Pool` composition.
     #[test]
     fn can_luma_inline() {
         let luma: Luma<Inline<Pool<str, u64>>> = Luma::new();
