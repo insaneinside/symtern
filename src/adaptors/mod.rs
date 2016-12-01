@@ -42,7 +42,13 @@
 //! println!("{}", inline_pool.resolve(&some_sym).expect("resolution failed")); //~ ERROR mismatched types [E0308]
 //! ```
 //!
-//! ## Inline
+//! ## Adaptor Types
+//!
+//! Symtern currently supplies two adaptor types, [`Inline`] and [`Luma`].
+//! The summaries provided here are intended only as an introduction; visit
+//! each adaptor's own documentation for more details.
+//!
+//! ### Inline
 //!
 //! By wrapping your `Pool<str, _>` type in the [`Inline`] adaptor, you can
 //! create an interner optimized for short strings.  When input strings are
@@ -68,7 +74,7 @@
 //! }
 //! ```
 //!
-//! ## Luma
+//! ### Luma
 //!
 //! The [`Luma`] adaptor uses interior mutability via `RefCell` to allow its
 //! symbols to carry a lifetime parameter, which is used to prevent the pool
