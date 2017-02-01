@@ -11,9 +11,9 @@ use std::hash::Hash;
 use std::borrow::{Borrow, ToOwned};
 #[cfg(debug_assertions)] use std::sync::atomic::{self, AtomicUsize, Ordering};
 
-use traits::{Intern, Resolve, ResolveUnchecked, Len, SymbolId};
+use traits::{Intern, Resolve, ResolveUnchecked, Len};
 use {core, Result, ErrorKind};
-use sym::{Symbol as ISymbol, Pool as IPool};
+use sym::{Pool as IPool, Symbol, SymbolId};
 
 
 #[cfg(debug_assertions)]

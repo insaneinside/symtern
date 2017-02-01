@@ -11,9 +11,9 @@ use std::{mem, str};
 
 use num_traits::ToPrimitive;
 
-use traits::{Intern, Resolve, Len, SymbolId};
+use traits::{Intern, Resolve, Len};
 use {ErrorKind, Result};
-use sym::{self, Symbol};
+use sym::{self, Symbol, SymbolId};
 
 /// Interface used to pack strings into symbol-IDs.  Any implementations of
 /// this trait *must* store inlined-string length in the most-significant

@@ -12,9 +12,14 @@
 //! implementing your own interner or adaptor types.  Because they allow you to
 //! create symbols out of thin air and inspect implementation details, Bad
 //! Things™ are likely to happen if you use their methods in other contexts.
+use std::hash::Hash;
+use ::num_traits::{Bounded, Unsigned, FromPrimitive, ToPrimitive};
 
-use traits::{self, SymbolId};
+use traits;
 
+/// Trait describing primitive types used as symbols' internal representations.
+pub trait SymbolId: Copy + Eq + Hash + Bounded + Unsigned + FromPrimitive + ToPrimitive {}
+impl<T> SymbolId for T where T: Copy + Eq + Hash + Bounded + Unsigned + FromPrimitive + ToPrimitive {}
 /// Type that will be used for `Pool::Id` in all generated `Pool` impls.
 pub type PoolId = usize;
 

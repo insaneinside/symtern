@@ -161,15 +161,10 @@
 //! [Resolve::Input]: trait.Resolve.html#associatedtype.Input
 //! [Scala's path-dependent types]: http://danielwestheide.com/blog/2013/02/13/the-neophytes-guide-to-scala-part-13-path-dependent-types.html
 use std::hash::Hash;
-use ::num_traits::{Bounded, Unsigned, FromPrimitive, ToPrimitive};
 
 use super::Result;
 
 // ----------------------------------------------------------------
-
-/// Trait describing primitive types used as symbols' internal representations.
-pub trait SymbolId: Copy + Eq + Hash + Bounded + Unsigned + FromPrimitive + ToPrimitive {}
-impl<T> SymbolId for T where T: Copy + Eq + Hash + Bounded + Unsigned + FromPrimitive + ToPrimitive {}
 
 /// Trait bounds for symbol (interned stand-in value) types.
 pub trait Symbol: Copy + Eq + Hash {}
