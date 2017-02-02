@@ -124,15 +124,17 @@ impl<S> sym::Symbol for Sym<S>
 
     fn id(&self) -> Self::Id { self.wrapped.id() }
     fn id_ref(&self) -> &Self::Id { self.wrapped.id_ref() }
+}
 
+impl<S> sym::Create for Sym<S> where S: sym::Create {
     #[cfg(not(debug_assertions))]
     fn create(id: Self::Id) -> Self {
-        Sym{wrapped: <S as ::sym::Symbol>::create(id)}
+        Sym{wrapped: S::create(id)}
     }
 
     #[cfg(debug_assertions)]
     fn create(id: Self::Id, pool_id: ::sym::PoolId) -> Self {
-        Sym{wrapped: <S as ::sym::Symbol>::create(id, pool_id)}
+        Sym{wrapped: S::create(id, pool_id)}
     }
 }
 

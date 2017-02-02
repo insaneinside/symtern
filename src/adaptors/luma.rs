@@ -35,7 +35,9 @@ impl<'a,W> sym::Symbol for Sym<'a, W>
     fn id_ref(&self) -> &Self::Id {
         self.wrapped.id_ref()
     }
+}
 
+impl<'a, W> sym::Create for Sym<'a, W> where W: sym::Create {
     #[cfg(debug_assertions)]
     fn create(id: Self::Id, pool_id: sym::PoolId) -> Self {
         Sym{wrapped: W::create(id, pool_id),

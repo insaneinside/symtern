@@ -71,7 +71,15 @@ pub trait Symbol: traits::Symbol {
     /// Fetch a reference to the symbol's ID.
     fn id_ref(&self) -> &Self::Id;
 
-    /// Create a new value with the given ID and source pool.
+    /// Fetch the symbol's ID by value.
+    fn id(&self) -> Self::Id {
+        *self.id_ref()
+    }
+}
+
+/// Interface for creating new symbols from raw IDs.
+pub trait Create: Symbol {
+    /// Create a new symbol with the given ID and source pool.
     #[cfg(debug_assertions)]
     fn create(id: Self::Id, pool_id: PoolId) -> Self;
 
