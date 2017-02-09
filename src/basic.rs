@@ -13,7 +13,7 @@ use std::borrow::{Borrow, ToOwned};
 
 use traits::{Intern, Resolve, ResolveUnchecked, Len};
 use {core, Result, ErrorKind};
-use sym::{Pool as IPool, Symbol, SymbolId};
+use sym::{self, Create, Symbol, SymbolId, Pool as IPool};
 
 
 #[cfg(debug_assertions)]
@@ -26,9 +26,44 @@ type HashMap<K, V> = ::fnv::FnvHashMap<K, V>;
 #[cfg(not(feature = "fnv"))]
 type HashMap<K, V> = ::std::collections::HashMap<K, V>;
 
-make_sym! {
-    pub Sym<I>:
-    "Symbol type used by [`Pool`](struct.Pool.html)'s [`Intern`](../traits/trait.Intern.html) and [`Resolve`](../traits/trait.Resolve.html) implementations.";
+/// Symbol type used by [`Pool`]'s [`Intern`] and [`Resolve`] implementations.
+///
+/// [`Pool`]: struct.Pool.html
+/// [`Intern`]: ../traits/trait.Intern.html
+/// [`Resolve`]: ../traits/trait.Resolve.html
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Sym<I: SymbolId> {
+    id: I,
+    #[cfg(debug_assertions)]
+    pool_id: ::sym::PoolId
+}
+
+impl<I> Symbol for Sym<I>
+    where I: SymbolId
+{
+    type Id = I;
+
+    fn id(&self) -> Self::Id { self.id }
+    fn id_ref(&self) -> &Self::Id { &self.id }
+
+    #[cfg(debug_assertions)]
+    fn pool_id(&self) -> ::sym::PoolId {
+        self.pool_id
+    }
+}
+
+impl<I> Create for Sym<I>
+    where I: SymbolId
+{
+    #[cfg(not(debug_assertions))]
+    fn create(id: Self::Id) -> Self {
+        Sym{id: id}
+    }
+
+    #[cfg(debug_assertions)]
+    fn create(id: Self::Id, pool_id: ::sym::PoolId) -> Self {
+        Sym{id: id, pool_id: pool_id}
+    }
 }
 
 /// Simple hash-based interner generic over both the type of interned values
