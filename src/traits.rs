@@ -205,12 +205,9 @@ pub trait Intern {
 /// its referent.
 ///
 /// In order to allow for implementations that require a lifetime parameter,
-/// this trait's methods take `self` by value; for a given type `T`, the trait
-/// should implemented for `&'a T`.
-pub trait Resolve {
-    /// Type passed to the [`resolve`](#tymethod.resolve) method.
-    type Input;
-
+/// this trait's methods take `self` by value; for a given type `U`, the trait
+/// should implemented for `&'a U`.
+pub trait Resolve<T> {
     /// Type stored by the interner and made available with `resolve`.
     type Output;
 
@@ -223,7 +220,7 @@ pub trait Resolve {
     ///     Err(err) => return Err(MyErrorType::from(err)),
     /// };
     /// ```
-    fn resolve(self, symbol: Self::Input) -> Result<Self::Output>;
+    fn resolve(self, symbol: T) -> Result<Self::Output>;
 }
 
 
@@ -233,7 +230,7 @@ pub trait Resolve {
 /// Like [`Resolve`], this trait's methods take `self` by value.
 ///
 /// [`Resolve`]: trait.Resolve.html
-pub trait ResolveUnchecked: Resolve {
+pub trait ResolveUnchecked<T>: Resolve<T> {
     /// Resolve the given symbol into its referent, bypassing any
     /// validity checks.
     ///
@@ -243,7 +240,7 @@ pub trait ResolveUnchecked: Resolve {
     ///
     /// assert_eq!("abc", unsafe { pool.resolve_unchecked(sym) });
     /// ```
-    unsafe fn resolve_unchecked(self, symbol: Self::Input) -> Self::Output;
+    unsafe fn resolve_unchecked(self, symbol: T) -> Self::Output;
 }
 
 

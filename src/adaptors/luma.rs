@@ -143,6 +143,24 @@ impl<'a, W, BI, BO: ?Sized> traits::Resolve for &'a Luma<W>
 
 impl<W> traits::Len for Luma<W> where W: traits::Len {
     fn len(&self) -> usize {
+macro_rules! impl_resolve {
+    (by_reference) => { impl_resolve!(@impl['sym: 'a,][&'sym][&]); };
+    (by_value) => { impl_resolve!(@impl[][][]); };
+    (@impl[$($lt: tt)*][$($pre: tt)*][$($take_ref: tt)*]) => {
+        impl<'a, $($lt)* W: 'a, WS> traits::Resolve<$($pre)* Sym<'a, WS>> for &'a Luma<W>
+            where for<'b> &'b W: sym::Pool<Symbol=WS> + traits::Resolve<$($pre)* WS>,
+        {
+            type Output = Ref<'a,<<&'a W as traits::Resolve<$($pre)* WS>>::Output as traits::RemoveRef>::Type>;
+
+            fn resolve(self, sym: $($pre)* WS) -> Result<Self::Output> {
+                Ok(Ref::map(self.wrapped.borrow(), |w| w.resolve($($take_ref)* sym.wrapped).unwrap()))
+            }
+        }
+    };
+}
+impl_resolve!(by_reference);
+impl_resolve!(by_value);
+
         self.wrapped.borrow().len()
     }
     fn is_full(&self) -> bool {

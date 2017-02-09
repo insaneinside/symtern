@@ -292,20 +292,20 @@ macro_rules! impl_intern {
 impl_intern!();
 impl_intern!(mut);
 
+impl<'a, 'sym, W, WS> Resolve<&'sym Sym<WS>> for &'a Inline<W>
+    where 'sym: 'a,
+          &'a W: sym::Pool<Symbol=WS> + Resolve<&'sym WS, Output=&'a str>,
+          WS: sym::Symbol,
+          WS::Id: Pack
 
-impl<'a, W, WS> Resolve for &'a Inline<W>
-    where for<'b> &'b W: Resolve<Input=WS, Output=&'b str>,
-          WS: 'a + sym::Symbol,
-          WS::Id: Pack + SymbolId,
 {
-    type Input = &'a Sym<WS>;
     type Output = &'a str;
 
-    fn resolve(self, symbol: Self::Input) -> Result<Self::Output>
+    fn resolve(self, symbol: &'sym Sym<WS>) -> Result<Self::Output>
     {
         match symbol.id_ref().get_packed_ref() {
             Some(s) => Ok(s),
-            None => self.wrapped.resolve(symbol.wrapped)
+            None => self.wrapped.resolve(&symbol.wrapped)
         }
     }
 }

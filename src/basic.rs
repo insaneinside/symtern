@@ -241,37 +241,44 @@ macro_rules! check_matching_pool {
 
 // ----------------------------------------------------------------
 // Resolve
-impl<'a,T: ?Sized, I> Resolve for &'a Pool<T, I>
-    where T: ToOwned + Eq + Hash,
-          T::Owned: Eq + Hash + Borrow<T>,
-          I: SymbolId
-{
-    type Input = <&'a mut Pool<T, I> as Intern>::Symbol;
-    type Output = &'a T;
+macro_rules! impl_resolve {
+    (by_reference) => { impl_resolve!(@impl['sym,][&'sym]); };
+    (by_value) => { impl_resolve!(@impl[][]); };
+    (@impl[$($lt: tt)*][$($pre: tt)*]) => {
+        impl<'a, $($lt)* T: ?Sized, TO, I> Resolve<$($pre)* Sym<I>> for &'a Pool<T, I>
+            where T: ToOwned<Owned=TO> + Eq + Hash,
+                  TO: 'a + Eq + Hash + Borrow<T>,
+                  I: SymbolId,
+        {
+            type Output = &'a T;
 
-    fn resolve(self, s: Self::Input) -> Result<Self::Output> {
-        check_matching_pool!(self, s);
-        // We previously converted the ID _from_ a usize, so this conversion should _not_ fail.
-        let idx = s.id().to_usize().expect("Unexpected failure to convert symbol ID to usize");
+            fn resolve(self, s: $($pre)* Sym<I>) -> Result<Self::Output> {
+                check_matching_pool!(self, s);
+                // We previously converted the ID _from_ a usize, so this conversion should _not_ fail.
+                let idx = s.id().to_usize().expect("Unexpected failure to convert symbol ID to usize");
 
-        if self.lookup_vec.len() > idx {
-            Ok(self.lookup_vec[idx].borrow())
-        } else {
-            Err(ErrorKind::NoSuchSymbol.into())
+                if self.lookup_vec.len() > idx {
+                    Ok(self.lookup_vec[idx].borrow())
+                } else {
+                    Err(ErrorKind::NoSuchSymbol.into())
+                }
+            }
         }
-    }
-}
-impl<'a, T: ?Sized, I> ResolveUnchecked for &'a Pool<T, I>
-    where T: ToOwned + Eq + Hash,
-          T::Owned: Eq + Hash + Borrow<T>,
-          I: SymbolId
-{
-    unsafe fn resolve_unchecked(self, symbol: Self::Input) -> Self::Output {
-        let idx = symbol.id().to_usize().expect("Unexpected failure to convert symbol ID to usize");
-        self.lookup_vec.get_unchecked(idx).borrow()
-    }
+        impl<'a, $($lt)* T: ?Sized, TO, I> ResolveUnchecked<$($pre)*Sym<I>> for &'a Pool<T, I>
+            where T: ToOwned<Owned=TO> + Eq + Hash,
+                  TO: 'a + Eq + Hash + Borrow<T>,
+                  I: SymbolId,
+        {
+            unsafe fn resolve_unchecked(self, symbol: $($pre)* Sym<I>) -> Self::Output {
+                let idx = symbol.id().to_usize().expect("Unexpected failure to convert symbol ID to usize");
+                self.lookup_vec.get_unchecked(idx).borrow()
+            }
+        }
+    };
 }
 
+impl_resolve!(by_reference);
+impl_resolve!(by_value);
 
 #[cfg(test)]
 mod tests {
