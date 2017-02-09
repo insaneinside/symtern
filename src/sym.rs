@@ -23,21 +23,6 @@ impl<T> SymbolId for T where T: Copy + Eq + Hash + Bounded + Unsigned + FromPrim
 /// Type that will be used for `Pool::Id` in all generated `Pool` impls.
 pub type PoolId = usize;
 
-/// Types used by interner implementations.
-pub trait Types {
-    /// Symbol type associated with the pool; this should be the same as the
-    /// associated type of the same name in any `Interner` implementations.
-    type Symbol: Symbol;
-
-    /// Input accepted by reference as an argument to `intern` on `Interner` or
-    /// `InternerMut`.
-    type Input: ?Sized;
-
-    /// Value returned by reference in the result from `resolve` on `Resolve`,
-    /// `resolve_ref` on `ResolveRef`, or `resolve_unchecked` on
-    /// `ResolveUnchecked`.
-    type Output: ?Sized;
-}
 
 /// Internal trait for Pool types that provides a consistent symbol-creation
 /// interface regardless of whether or not the crate is compiled in debug mode.
@@ -88,19 +73,5 @@ pub trait Create: Symbol {
     fn create(id: Self::Id) -> Self;
 }
 
-impl<'a, T> Types for &'a T
-    where T: Types
-{
-    type Symbol = T::Symbol;
-    type Input = T::Input;
-    type Output = T::Output;
-}
 
-impl<'a, T> Types for &'a mut T
-    where T: Types
-{
-    type Symbol = T::Symbol;
-    type Input = T::Input;
-    type Output = T::Output;
-}
 
