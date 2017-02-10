@@ -127,17 +127,7 @@ impl<'a, W, BS, BI: ?Sized> traits::Intern for &'a Luma<W>
         let inner_result = self.wrapped.borrow_mut().intern(input);
         inner_result.map(From::from)
     }
-}
 
-impl<'a, W, BI, BO: ?Sized> traits::Resolve for &'a Luma<W>
-    where for<'b> &'b W: traits::Resolve<Input=BI, Output=&'b BO>,
-          BI: sym::Symbol + traits::Symbol,
-          BO: 'a
-{
-    type Input = Sym<'a,BI>;
-    type Output = Ref<'a,BO>;
-    fn resolve(self, sym: Self::Input) -> Result<Self::Output> {
-        Ok(Ref::map(self.wrapped.borrow(), |w| w.resolve(sym.wrapped).unwrap()))
     }
 }
 
