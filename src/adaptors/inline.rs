@@ -216,13 +216,14 @@ impl<W> From<W> for Inline<W> {
     }
 }
 
-impl<W> Len for Inline<W>
-    where W: Len + ::sym::Pool,
-          <<W as sym::Pool>::Symbol as sym::Symbol>::Id: Pack + ToPrimitive
+impl<'a, W, WS> Len for &'a Inline<W>
+    where for<'b> &'b W: Len + ::sym::Pool<Symbol=WS>,
+          WS: sym::Symbol,
+          <WS as sym::Symbol>::Id: Pack + ToPrimitive
 {
     /// Fetch the number of items contained in the pool.  The returned value
     /// does not count values inlined in symbols.
-    fn len(&self) -> usize {
+    fn len(self) -> usize {
         (&self.wrapped).len()
     }
 
@@ -230,14 +231,14 @@ impl<W> Len for Inline<W>
     ///
     /// Because strings inlined in symbols are not stored in the pool, they do
     /// not affect the result of this method.
-    fn is_empty(&self) -> bool {
+    fn is_empty(self) -> bool {
         (&self.wrapped).is_empty()
     }
 
     /// Check if the number of interned symbols has reached the maximum allowed
     /// for the pool's ID type.
-    fn is_full(&self) -> bool {
-        (&self.wrapped).len() >= <<<W as sym::Pool>::Symbol as sym::Symbol>::Id as Pack>::msb_mask().to_usize().unwrap()
+    fn is_full(self) -> bool {
+        (&self.wrapped).len() >= <<WS as sym::Symbol>::Id as Pack>::msb_mask().to_usize().unwrap()
     }
 }
 

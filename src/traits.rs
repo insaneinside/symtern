@@ -246,14 +246,28 @@ pub trait ResolveUnchecked<T>: Resolve<T> {
 
 /// Trait for use with interners that can report the number of values
 /// they contain.
+///
+/// Because an interner's capacity may depend on its symbol type &mdash; which
+/// in generic contexts is obtained via the [`Symbol`] associated type on its
+/// [`sym::Pool`] implementation &mdash; this trait needs to be implemented on
+/// the same type as `sym::Pool` (typically `&'a T`).
 pub trait Len {
     /// Fetch the number of values contained in the interner.
-    fn len(&self) -> usize;
+    fn len(self) -> usize;
 
     /// Check if the number of interned symbols has reached the
     /// maximum allowed.
-    fn is_full(&self) -> bool;
+    fn is_full(self) -> bool;
 
     /// Check if the interner is "empty", i.e. has zero stored values.
-    fn is_empty(&self) -> bool;
+    fn is_empty(self) -> bool;
+}
+
+
+pub trait RemoveRef {
+    type Type;
+}
+
+impl<'a,T> RemoveRef for &'a T {
+    type Type = T;
 }

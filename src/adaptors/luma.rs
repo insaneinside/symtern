@@ -141,8 +141,6 @@ impl<'a, W, BI, BO: ?Sized> traits::Resolve for &'a Luma<W>
     }
 }
 
-impl<W> traits::Len for Luma<W> where W: traits::Len {
-    fn len(&self) -> usize {
 macro_rules! impl_resolve {
     (by_reference) => { impl_resolve!(@impl['sym: 'a,][&'sym][&]); };
     (by_value) => { impl_resolve!(@impl[][][]); };
@@ -161,12 +159,17 @@ macro_rules! impl_resolve {
 impl_resolve!(by_reference);
 impl_resolve!(by_value);
 
+
+impl<'a, W> traits::Len for &'a Luma<W>
+    where for<'b> &'b W: traits::Len
+{
+    fn len(self) -> usize {
         self.wrapped.borrow().len()
     }
-    fn is_full(&self) -> bool {
+    fn is_full(self) -> bool {
         self.wrapped.borrow().is_full()
     }
-    fn is_empty(&self) -> bool {
+    fn is_empty(self) -> bool {
         self.wrapped.borrow().is_empty()
     }
 }

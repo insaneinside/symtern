@@ -126,24 +126,24 @@ impl<T: ?Sized, I> Pool<T, I>
     }
 }
 
-impl<'a, T: ?Sized, I> Len for Pool<T, I>
-    where T: ToOwned + Eq + Hash,
-          T::Owned: Eq + Hash,
-          I: SymbolId
+impl<'a, T: ?Sized, I, TO> Len for &'a Pool<T, I>
+    where T: 'a + ToOwned<Owned=TO> + Eq + Hash,
+          TO: Eq + Hash + Borrow<T>,
+          I: 'a + SymbolId
 {
     /// Get the number of entries contained in the pool.
-    fn len(&self) -> usize {
+    fn len(self) -> usize {
         self.lookup_vec.len()
     }
 
     /// Check if the pool is "empty", i.e. has zero stored values.
-    fn is_empty(&self) -> bool {
+    fn is_empty(self) -> bool {
         self.lookup_vec.is_empty()
     }
 
     /// Check if the number of interned symbols has reached the maximum allowed
     /// for the pool's ID type.
-    fn is_full(&self) -> bool {
+    fn is_full(self) -> bool {
         // Symbol IDs range from 0 to M, where M is given by `I::max_value()`;
         // hence a pool containing N entries is full iff N == M + 1.
         let len = self.len();
