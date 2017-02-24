@@ -13,7 +13,7 @@ by identity only.
 
 As we would expect, interning works well with string types.
 
-```rust file="examples/intro.rs" id="basic"
+```rust
 // Import Symtern's traits, which allow us to use each interner the same way
 // regardless of the underlying implementation.
 use symtern::prelude::*;
@@ -40,7 +40,7 @@ The type used to identify a given interner's symbols can represent only
 a finite range of values; because of this you must allow for the possibility
 that any attempt to intern a value may fail.
 
-```rust file="examples/error-handling.rs" id="overflow"
+```rust
 use symtern::prelude::*;
 use symtern::Pool;
 use symtern::ErrorKind;
