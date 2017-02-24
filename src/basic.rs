@@ -1,4 +1,4 @@
-// Copyright (C) 2016 Symtern Project Contributors
+// Copyright (C) 2016-2017 Symtern Project Contributors
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-Apache
 // or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -84,7 +84,7 @@ impl<I> Create for Sym<I>
 /// let mut pool = Pool::<_,u8>::new();
 /// assert!(pool.intern(&WibbleWobble{whee: vec![1, 2, 3, 4, 5]}).is_ok());
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Pool<T: ?Sized, I = usize>
     where T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash,
@@ -94,24 +94,6 @@ pub struct Pool<T: ?Sized, I = usize>
     lookup_vec: Vec<T::Owned>,
     #[cfg(debug_assertions)]
     pool_id: usize
-}
-
-impl<T: ?Sized, I> Clone for Pool<T, I>
-    where T: ToOwned + Eq + Hash,
-          T::Owned: Eq + Hash + Clone,
-          I: SymbolId,
-{
-    #[cfg(debug_assertions)]
-    fn clone(&self) -> Self {
-        Pool{ids_map: self.ids_map.clone(),
-             lookup_vec: self.lookup_vec.clone(),
-             pool_id: self.pool_id}
-    }
-    #[cfg(not(debug_assertions))]
-    fn clone(&self) -> Self {
-        Pool{ids_map: self.ids_map.clone(),
-             lookup_vec: self.lookup_vec.clone()}
-    }
 }
 
 // (inherent impl)
