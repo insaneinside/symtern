@@ -1,6 +1,6 @@
 [package]
 name = "symtern"
-version = "0.1.0-pre.1"
+version = "0.1.0"
 authors = ["Collin J. Sutton <collin.sutton@gmail.com>"]
 description = "Fast general-purpose interners for every use case"
 
