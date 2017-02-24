@@ -1,4 +1,4 @@
-// Copyright (C) 2016 Symtern Project Contributors
+// Copyright (C) 2016-2017 Symtern Project Contributors
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-Apache
 // or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -19,7 +19,7 @@ type Pool = Luma<Basic<str, u32>>;
 /// Return a Sym from a temporary Luma-wrapped interner.  This causes a compile
 /// error because the interner, which is dropped at the end of the function, is
 /// referenced by the returned symbol.
-fn make_sym<'a>(s: &str) -> <&'a Pool as symtern::traits::Intern>::Output {
+fn make_sym<'a>(s: &str) -> <&'a Pool as symtern::traits::Intern>::Symbol {
     Pool::new().intern(s).unwrap() //~ ERROR borrowed value does not live long enough
 }
 //` }

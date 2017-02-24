@@ -1,4 +1,4 @@
-// Copyright (C) 2016 Symtern Project Contributors
+// Copyright (C) 2016-2017 Symtern Project Contributors
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-Apache
 // or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -48,7 +48,7 @@ pub trait Pool {
     /// Create a symbol with the specified ID.  Do **not** use this method
     /// unless you are implementing a new symbol pool or adaptor type!
     /// Any created symbol _must_ be resolvable on an existing pool.
-    fn create_symbol(self, id: <Self::Symbol as Symbol>::Id) -> Self::Symbol;
+    fn create_symbol(&self, id: <Self::Symbol as Symbol>::Id) -> Self::Symbol;
 }
 
 /// Interface used to extract internal ID values from symbols.
