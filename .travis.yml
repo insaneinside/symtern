@@ -15,5 +15,6 @@ before_script:
 script:
   - |
       travis-cargo build &&
-      travis-cargo --only nightly test &&
-      travis-cargo --only nightly bench
+      travis-cargo --only nightly test
+# Benchmarks (temporarily) disabled because we’re running out of test strings.
+#     travis-cargo --only nightly bench
