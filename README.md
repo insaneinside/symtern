@@ -1,4 +1,5 @@
 # Symtern: Fast general-purpose interners for every use case
+[![Build Status](https://travis-ci.org/insaneinside/symtern.svg?branch=master)](https://travis-ci.org/insaneinside/symtern)
 
 Symtern is a selection of high-performance interner implementations written
 in Rust.
