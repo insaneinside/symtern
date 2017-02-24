@@ -1,4 +1,4 @@
-// Copyright (C) 2016 Symtern Project Contributors
+// Copyright (C) 2016-2017 Symtern Project Contributors
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-Apache
 // or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -337,6 +337,7 @@ mod tests {
     /// them.  This is a compile-time check:  we're verifying that the Resolve
     /// implementation works whether the wrapped pool takes its `resolve`
     /// argument by value *or* by reference.
+    #[cfg(feature="composition-tests")]
     #[test]
     fn can_stack_inliners() {
         let mut pool = Inline::<Inline<::basic::Pool<str,u16>>>::new();

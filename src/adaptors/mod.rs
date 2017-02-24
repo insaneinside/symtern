@@ -1,4 +1,4 @@
-// Copyright (C) 2016 Symtern Project Contributors
+// Copyright (C) 2016-2017 Symtern Project Contributors
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-Apache
 // or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -103,7 +103,7 @@ mod luma;
 pub use self::inline::{Inline, Sym as InlineSym};
 pub use self::luma::{Luma, Sym as LumaSym};
 
-#[cfg(test)]
+#[cfg(all(feature = "composition-tests", test))]
 mod tests {
     use Pool;
     use super::{Inline, Luma};
