@@ -17,6 +17,10 @@ exclude = ["scripts"]
 [features]
 default = ["fnv"]
 
+# Feature `128-bit-integers` adds support for 128-bit integers
+# where appropriate.
+128-bit-integers = []
+
 [lib]
 path = "src/lib.rs"
 

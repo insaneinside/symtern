@@ -105,6 +105,8 @@ macro_rules! impl_pack {
 impl_pack!(u16, 2);
 impl_pack!(u32, 4);
 impl_pack!(u64, 8);
+#[cfg(feature = "128-bit-integers")]
+impl_pack!(u128, 16);
 
 /// Symbol type used by the [`Inline`](struct.Inline.html) adaptor.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

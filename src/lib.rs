@@ -1,4 +1,4 @@
-// Copyright (C) 2016 Symtern Project Contributors
+// Copyright (C) 2016-2017 Symtern Project Contributors
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-Apache
 // or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -86,6 +86,7 @@
 //! [`Pool`]: struct.Pool.html
 //! [`adaptors` module]: adaptors/index.html
 //! [`traits` module]: traits/index.html
+#![cfg_attr(feature = "128-bit-integers", feature(i128_type))]
 #![warn(missing_docs)]
 extern crate num_traits;
 #[cfg(feature = "fnv")] extern crate fnv;
