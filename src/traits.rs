@@ -1,4 +1,4 @@
-// Copyright (C) 2016 Symtern Project Contributors
+// Copyright (C) 2016-2017 Symtern Project Contributors
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-Apache
 // or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -183,7 +183,7 @@ pub trait Intern {
     type Input: ?Sized;
 
     /// Type used to represent interned values.
-    type Symbol: Symbol + ::sym::Symbol;
+    type Output: Symbol;
 
     /// Fetch the symbol that corresponds to the given value.  If the value
     /// does not map to any existing symbol, create and return a new one.
@@ -196,7 +196,7 @@ pub trait Intern {
     ///     Err(err) => return Err(MyErrorType::from(err)),
     /// };
     /// ```
-    fn intern(self, value: &Self::Input) -> Result<Self::Symbol>;
+    fn intern(self, value: &Self::Input) -> Result<Self::Output>;
 }
 
 // ----------------------------------------------------------------
