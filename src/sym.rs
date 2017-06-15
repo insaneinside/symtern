@@ -20,9 +20,10 @@ use traits;
 /// Trait describing primitive types used as symbols' internal representations.
 pub trait SymbolId: Copy + Eq + Hash + Bounded + Unsigned + FromPrimitive + ToPrimitive {}
 impl<T> SymbolId for T where T: Copy + Eq + Hash + Bounded + Unsigned + FromPrimitive + ToPrimitive {}
-/// Type that will be used for `Pool::Id` in all generated `Pool` impls.
-pub type PoolId = usize;
 
+/// Type that will be used for `Pool::Id` in all `Pool` impls.
+#[cfg(debug_assertions)]
+pub type PoolId = usize;
 
 /// Internal trait for Pool types that provides a consistent symbol-creation
 /// interface regardless of whether or not the crate is compiled in debug mode.
