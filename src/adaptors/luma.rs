@@ -116,11 +116,11 @@ impl<W> From<W> for Luma<W> {
     }
 }
 
-impl<'a, W: ?Sized, WS> sym::Pool for &'a Luma<W>
-    where for<'b> &'b W: sym::Pool<Symbol=WS>,
-          WS: sym::Symbol,
+impl<'a, W: ?Sized> sym::Pool for &'a Luma<W>
+    where for<'b> &'b W: sym::Pool,
+          for<'b> <&'b W as sym::Pool>::Symbol: sym::Symbol,
 {
-    type Symbol = Sym<'a,WS>;
+    type Symbol = Sym<'a,<&'a W as sym::Pool>::Symbol>;
 
     #[cfg(debug_assertions)]
     fn id(self) -> sym::PoolId {
@@ -129,26 +129,25 @@ impl<'a, W: ?Sized, WS> sym::Pool for &'a Luma<W>
     }
 
     #[cfg(debug_assertions)]
-    fn create_symbol(self, id: WS::Id) -> Sym<'a, WS> {
+    fn create_symbol(self, id: <Self::Symbol as sym::Symbol>::Id) -> Self::Symbol {
         Sym::create(id, Self::id(self))
     }
 
     /// Create a new value with the given ID.
     #[cfg(not(debug_assertions))]
-    fn create_symbol(self, id: WS::Id) -> Sym<'a, WS> {
+    fn create_symbol(self, id: <Self::Symbol as sym::Symbol>::Id) -> Self::Symbol {
         Sym::create(id)
     }
 }
 
 macro_rules! impl_intern {
     ($($mute: tt)*) => {
-        impl<'a, W, BI: ?Sized, BO> traits::Intern for &'a $($mute)* Luma<W>
-            where for<'b> &'b $($mute)* W: sym::Pool<Symbol=BO> + traits::Intern<Input=BI, Output=BO>,
+        impl<'a, W> traits::Intern for &'a $($mute)* Luma<W>
+            where for<'b> &'b $($mute)* W: sym::Pool + traits::Intern,
                   W: 'a,
-                  BO: 'a + sym::Symbol + traits::Symbol
         {
-            type Input = BI;
-            type Output = Sym<'a,BO>;
+            type Input = <&'a W as traits::Intern>::Input;
+            type Output = Sym<'a,<&'a W as traits::Intern>::Output>;
 
             fn intern(self, input: &Self::Input) -> Result<Self::Output> {
                 let inner_result = self.wrapped.borrow_mut().intern(input);
@@ -168,12 +167,12 @@ macro_rules! impl_resolve {
     (by_reference) => { impl_resolve!(@impl['sym: 'a,][&'sym][&]); };
     (by_value) => { impl_resolve!(@impl[][][]); };
     (@impl[$($lt: tt)*][$($pre: tt)*][$($take_ref: tt)*]) => {
-        impl<'a, $($lt)* W: 'a, WS> traits::Resolve<$($pre)* Sym<'a, WS>> for &'a Luma<W>
-            where for<'b> &'b W: sym::Pool<Symbol=WS> + traits::Resolve<$($pre)* WS>,
+        impl<'a, $($lt)* W: 'a> traits::Resolve<$($pre)* Sym<'a, <&'a W as sym::Pool>::Symbol>> for &'a Luma<W>
+            where for<'b> &'b W: sym::Pool + traits::Resolve<$($pre)* <&'b W as sym::Pool>::Symbol>,
         {
-            type Output = Ref<'a,<<&'a W as traits::Resolve<$($pre)* WS>>::Output as traits::RemoveRef>::Type>;
+            type Output = Ref<'a,<<&'a W as traits::Resolve<$($pre)* <&'a W as sym::Pool>::Symbol>>::Output as traits::RemoveRef>::Type>;
 
-            fn resolve(self, sym: $($pre)* WS) -> Result<Self::Output> {
+            fn resolve(self, sym: $($pre)* <&'a W as sym::Pool>::Symbol) -> Result<Self::Output> {
                 Ok(Ref::map(self.wrapped.borrow(), |w| w.resolve($($take_ref)* sym.wrapped).unwrap()))
             }
         }

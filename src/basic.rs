@@ -108,9 +108,9 @@ impl<T: ?Sized, I> Pool<T, I>
     }
 }
 
-impl<'a, T: ?Sized, I, TO> Len for &'a Pool<T, I>
-    where T: 'a + ToOwned<Owned=TO> + Eq + Hash,
-          TO: Eq + Hash + Borrow<T>,
+impl<'a, T: ?Sized, I> Len for &'a Pool<T, I>
+    where T: 'a + ToOwned + Eq + Hash,
+          T::Owned: Eq + Hash + Borrow<T>,
           I: 'a + SymbolId
 {
     /// Get the number of entries contained in the pool.
@@ -133,9 +133,9 @@ impl<'a, T: ?Sized, I, TO> Len for &'a Pool<T, I>
     }
 }
 
-impl<'a, T: ?Sized, I, TO> sym::Pool for &'a Pool<T, I>
-    where T: 'a + ToOwned<Owned=TO> + Eq + Hash,
-          TO: Eq + Hash + Borrow<T>,
+impl<'a, T: ?Sized, I> sym::Pool for &'a Pool<T, I>
+    where T: 'a + ToOwned + Eq + Hash,
+          T::Owned: Eq + Hash + Borrow<T>,
           I: 'a + SymbolId
 {
     type Symbol = Sym<I>;
@@ -157,9 +157,9 @@ impl<'a, T: ?Sized, I, TO> sym::Pool for &'a Pool<T, I>
 }
 
 // Default
-impl<T: ?Sized, I, TO> Default for Pool<T, I>
-    where T: ToOwned<Owned=TO> + Eq + Hash,
-          TO: Eq + Hash + Borrow<T>,
+impl<T: ?Sized, I> Default for Pool<T, I>
+    where T: ToOwned + Eq + Hash,
+          T::Owned: Eq + Hash + Borrow<T>,
           I: SymbolId
 {
     #[cfg(not(debug_assertions))]
@@ -176,10 +176,10 @@ impl<T: ?Sized, I, TO> Default for Pool<T, I>
 }
 
 // Intern
-impl<'a, T: ?Sized, I, TO> Intern for &'a mut Pool<T, I>
+impl<'a, T: ?Sized, I> Intern for &'a mut Pool<T, I>
     where I: SymbolId,
-          T: ToOwned<Owned=TO> + Eq + Hash,
-          TO: Eq + Hash + Borrow<T>,
+          T: ToOwned + Eq + Hash,
+          T::Owned: Eq + Hash + Borrow<T>,
 {
     type Input = T;
     type Output = Sym<I>;
@@ -227,9 +227,9 @@ macro_rules! impl_resolve {
     (by_reference) => { impl_resolve!(@impl['sym,][&'sym]); };
     (by_value) => { impl_resolve!(@impl[][]); };
     (@impl[$($lt: tt)*][$($pre: tt)*]) => {
-        impl<'a, $($lt)* T: ?Sized, TO, I> Resolve<$($pre)* Sym<I>> for &'a Pool<T, I>
-            where T: ToOwned<Owned=TO> + Eq + Hash,
-                  TO: 'a + Eq + Hash + Borrow<T>,
+        impl<'a, $($lt)* T: ?Sized, I> Resolve<$($pre)* Sym<I>> for &'a Pool<T, I>
+            where T: ToOwned + Eq + Hash,
+                  T::Owned: 'a + Eq + Hash + Borrow<T>,
                   I: SymbolId,
         {
             type Output = &'a T;
@@ -246,9 +246,9 @@ macro_rules! impl_resolve {
                 }
             }
         }
-        impl<'a, $($lt)* T: ?Sized, TO, I> ResolveUnchecked<$($pre)*Sym<I>> for &'a Pool<T, I>
-            where T: ToOwned<Owned=TO> + Eq + Hash,
-                  TO: 'a + Eq + Hash + Borrow<T>,
+        impl<'a, $($lt)* T: ?Sized, I> ResolveUnchecked<$($pre)*Sym<I>> for &'a Pool<T, I>
+            where T: ToOwned + Eq + Hash,
+                  T::Owned: 'a + Eq + Hash + Borrow<T>,
                   I: SymbolId,
         {
             unsafe fn resolve_unchecked(self, symbol: $($pre)* Sym<I>) -> Self::Output {

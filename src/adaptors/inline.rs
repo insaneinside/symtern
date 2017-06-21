@@ -11,7 +11,7 @@ use std::{mem, str};
 
 use num_traits::ToPrimitive;
 
-use traits::{Intern, Resolve, Len};
+use traits::{self, Intern, Resolve, Len};
 use {ErrorKind, Result};
 use sym::{self, Pool, Symbol};
 
@@ -218,10 +218,9 @@ impl<W> From<W> for Inline<W> {
     }
 }
 
-impl<'a, W, WS> Len for &'a Inline<W>
-    where for<'b> &'b W: Len + ::sym::Pool<Symbol=WS>,
-          WS: sym::Symbol,
-          <WS as sym::Symbol>::Id: Pack + ToPrimitive
+impl<'a, W> Len for &'a Inline<W>
+    where for<'b> &'b W: Len + sym::Pool,
+          for<'b> <<&'b W as sym::Pool>::Symbol as sym::Symbol>::Id: Pack + ToPrimitive
 {
     /// Fetch the number of items contained in the pool.  The returned value
     /// does not count values inlined in symbols.
@@ -240,7 +239,7 @@ impl<'a, W, WS> Len for &'a Inline<W>
     /// Check if the number of interned symbols has reached the maximum allowed
     /// for the pool's ID type.
     fn is_full(self) -> bool {
-        (&self.wrapped).len() >= <<WS as sym::Symbol>::Id as Pack>::msb_mask().to_usize().unwrap()
+        (&self.wrapped).len() >= <<<&'a W as sym::Pool>::Symbol as sym::Symbol>::Id as Pack>::msb_mask().to_usize().unwrap()
     }
 }
 
@@ -261,18 +260,17 @@ impl<'a, W: ?Sized> ::sym::Pool for &'a Inline<W>
 
 macro_rules! impl_intern {
     ($($mute: tt)*) => {
-        impl<'a, W, WO> Intern for &'a $($mute)* Inline<W>
-            where for<'b> &'b $($mute)* W: Intern<Input=str, Output=WO>,
-                  for<'b> &'b Inline<W>: Len + sym::Pool<Symbol=Sym<WO>>,
-                  Sym<WO>: sym::Symbol<Id=WO::Id>,
-                  WO: sym::Symbol,
-                  WO::Id: Pack,
+        impl<'a, W> Intern for &'a $($mute)* Inline<W>
+            where for<'b> &'b $($mute)* W: Intern<Input=str>,
+                  for<'b> &'b Inline<W>: Len + sym::Pool,
+                  Sym<<&'a W as sym::Pool>::Symbol>: sym::Symbol,
+                  <<&'a W as sym::Pool>::Symbol as sym::Symbol>::Id: Pack,
         {
             type Input = str;
-            type Output = Sym<WO>;
+            type Output = Sym<<&'a W as traits::Intern>::Output>;
 
             fn intern(self, s: &Self::Input) -> Result<Self::Output> {
-                match WO::Id::pack(s) {
+                match <Self::Symbol as sym::Symbol>::Id::pack(s) {
                     Some(id) => Ok(self.create_symbol(id)),
                     None => {
                         // since max capacity is changed by this adaptor, we
@@ -294,16 +292,15 @@ macro_rules! impl_intern {
 impl_intern!();
 impl_intern!(mut);
 
-impl<'a, 'sym, W, WS> Resolve<&'sym Sym<WS>> for &'a Inline<W>
+impl<'a, 'sym, W> Resolve<&'sym Sym<<&'a W as sym::Pool>::Symbol>> for &'a Inline<W>
     where 'sym: 'a,
-          &'a W: sym::Pool<Symbol=WS> + Resolve<&'sym WS, Output=&'a str>,
-          WS: sym::Symbol,
-          WS::Id: Pack
+          &'a W: sym::Pool + Resolve<&'sym <&'a W as sym::Pool>::Symbol, Output=&'a str>,
+          <<&'a W as sym::Pool>::Symbol as sym::Symbol>::Id: Pack
 
 {
     type Output = &'a str;
 
-    fn resolve(self, symbol: &'sym Sym<WS>) -> Result<Self::Output>
+    fn resolve(self, symbol: &'sym Sym<<&'a W as sym::Pool>::Symbol>) -> Result<Self::Output>
     {
         match symbol.id_ref().get_packed_ref() {
             Some(s) => Ok(s),
