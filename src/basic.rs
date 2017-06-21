@@ -133,33 +133,33 @@ impl<'a, T: ?Sized, I, TO> Len for &'a Pool<T, I>
     }
 }
 
-impl<'a, T: ?Sized, I> ::sym::Pool for Pool<T, I>
-    where T: ToOwned + Eq + Hash,
-          T::Owned: Eq + Hash,
-          I: SymbolId
+impl<'a, T: ?Sized, I, TO> sym::Pool for &'a Pool<T, I>
+    where T: 'a + ToOwned<Owned=TO> + Eq + Hash,
+          TO: Eq + Hash + Borrow<T>,
+          I: 'a + SymbolId
 {
     type Symbol = Sym<I>;
 
     #[cfg(debug_assertions)]
-    fn id(&self) -> ::sym::PoolId {
+    fn id(self) -> ::sym::PoolId {
         self.pool_id
     }
 
     #[cfg(not(debug_assertions))]
-    fn create_symbol(&self, id: <Self::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
+    fn create_symbol(self, id: <Self::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
         Sym::create(id)
     }
 
     #[cfg(debug_assertions)]
-    fn create_symbol(&self, id: <Self::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
+    fn create_symbol(self, id: <Self::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
         Sym::create(id, self.id())
     }
 }
 
 // Default
-impl<T: ?Sized, I> Default for Pool<T, I>
-    where T: ToOwned + Eq + Hash,
-          T::Owned: Eq + Hash,
+impl<T: ?Sized, I, TO> Default for Pool<T, I>
+    where T: ToOwned<Owned=TO> + Eq + Hash,
+          TO: Eq + Hash + Borrow<T>,
           I: SymbolId
 {
     #[cfg(not(debug_assertions))]
@@ -176,15 +176,15 @@ impl<T: ?Sized, I> Default for Pool<T, I>
 }
 
 // Intern
-impl<'a, T: ?Sized, I> Intern for &'a mut Pool<T, I>
+impl<'a, T: ?Sized, I, TO> Intern for &'a mut Pool<T, I>
     where I: SymbolId,
-          T: ToOwned + Eq + Hash,
-          T::Owned: Eq + Hash + Borrow<T>,
+          T: ToOwned<Owned=TO> + Eq + Hash,
+          TO: Eq + Hash + Borrow<T>,
 {
     type Input = T;
-    type Symbol = Sym<I>;
+    type Output = Sym<I>;
 
-    fn intern(mut self, value: &Self::Input) -> Result<Self::Symbol> {
+    fn intern(mut self, value: &Self::Input) -> Result<Self::Output> {
         let key = core::hash::<T, core::DefaultHashAlgo>(value);
         if let Some(&id) = self.ids_map.get(&key) {
             return Ok(self.create_symbol(id))

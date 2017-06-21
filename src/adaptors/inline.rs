@@ -13,7 +13,7 @@ use num_traits::ToPrimitive;
 
 use traits::{Intern, Resolve, Len};
 use {ErrorKind, Result};
-use sym::{self, Symbol, SymbolId};
+use sym::{self, Pool, Symbol};
 
 /// Interface used to pack strings into symbol-IDs.  Any implementations of
 /// this trait *must* store inlined-string length in the most-significant
@@ -190,7 +190,7 @@ impl<S> From<S> for Sym<S> {
 /// [`Pool`]: ../struct.Pool.html
 /// [128-bit integers]: https://github.com/rust-lang/rfcs/blob/master/text/1504-int128.md
 #[derive(Copy, Clone, Debug)]
-pub struct Inline<W> {
+pub struct Inline<W: ?Sized> {
     wrapped: W
 }
 
@@ -244,41 +244,40 @@ impl<'a, W, WS> Len for &'a Inline<W>
     }
 }
 
-impl<W> ::sym::Pool for Inline<W>
-    where W: sym::Pool,
-          <<W as sym::Pool>::Symbol as sym::Symbol>::Id: Pack,
+impl<'a, W: ?Sized> ::sym::Pool for &'a Inline<W>
+    where &'a W: sym::Pool
 {
-    type Symbol = W::Symbol;
+    type Symbol = Sym<<&'a W as sym::Pool>::Symbol>;
 
     #[cfg(debug_assertions)]
-    fn id(&self) -> ::sym::PoolId {
+    fn id(self) -> ::sym::PoolId {
         self.wrapped.id()
     }
 
-    fn create_symbol(&self, id: <<W as sym::Pool>::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
-        <W as sym::Pool>::create_symbol(&self.wrapped, id).into()
+    fn create_symbol(self, id: <<&'a W as sym::Pool>::Symbol as sym::Symbol>::Id) -> Sym<<&'a W as sym::Pool>::Symbol> {
+        <&'a W as sym::Pool>::create_symbol(&self.wrapped, id).into()
     }
 }
 
-
 macro_rules! impl_intern {
-    ($($mutt: tt)*) => {
-        impl<'a, W, WS> Intern for &'a $($mutt)* Inline<W>
-            where W: Len + sym::Pool<Symbol=WS>,
-                  &'a $($mutt)* W: Intern<Input=str,Symbol=<W as sym::Pool>::Symbol>,
-                  WS: sym::Symbol,
-                  WS::Id: Pack
+    ($($mute: tt)*) => {
+        impl<'a, W, WO> Intern for &'a $($mute)* Inline<W>
+            where for<'b> &'b $($mute)* W: Intern<Input=str, Output=WO>,
+                  for<'b> &'b Inline<W>: Len + sym::Pool<Symbol=Sym<WO>>,
+                  Sym<WO>: sym::Symbol<Id=WO::Id>,
+                  WO: sym::Symbol,
+                  WO::Id: Pack,
         {
             type Input = str;
-            type Symbol = Sym<WS>;
+            type Output = Sym<WO>;
 
-            fn intern(self, s: &Self::Input) -> Result<Self::Symbol> {
-                match WS::Id::pack(s) {
-                    Some(id) => Ok(Sym{wrapped: self.wrapped.create_symbol(id)}),
+            fn intern(self, s: &Self::Input) -> Result<Self::Output> {
+                match WO::Id::pack(s) {
+                    Some(id) => Ok(self.create_symbol(id)),
                     None => {
                         // since max capacity is changed by this adaptor, we
                         // need to do a capacity-check here.
-                        if self.is_full() {
+                        if (&*self).is_full() {
                             Err(ErrorKind::PoolOverflow.into())
                         } else {
                             match self.wrapped.intern(s) {
@@ -313,9 +312,9 @@ impl<'a, 'sym, W, WS> Resolve<&'sym Sym<WS>> for &'a Inline<W>
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use ::prelude::*;
     use super::{Inline, Pack};
     use sym::Symbol;
     use traits::{Intern, Resolve, Len};
@@ -342,10 +341,10 @@ mod tests {
     /// them.  This is a compile-time check:  we're verifying that the Resolve
     /// implementation works whether the wrapped pool takes its `resolve`
     /// argument by value *or* by reference.
-    #[cfg(feature="composition-tests")]
+    #[cfg(feature = "composition-tests")]
     #[test]
     fn can_stack_inliners() {
-        let mut pool = Inline::<Inline<::basic::Pool<str,u16>>>::new();
+        let mut pool = Inline::<Inline<::basic::Pool<str,u32>>>::new();
         let xy = pool.intern("xy").expect("failed to intern two-character string");
         assert_eq!(Ok("xy"), pool.resolve(&xy));
     }

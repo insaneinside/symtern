@@ -1,6 +1,6 @@
 [package]
 name = "symtern"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Collin J. Sutton <collin.sutton@gmail.com>"]
 description = "Fast general-purpose interners for every use case"
 
@@ -20,6 +20,10 @@ default = ["fnv"]
 # Feature `128-bit-integers` adds support for 128-bit integers
 # where appropriate.
 128-bit-integers = []
+
+# Feature `composition-tests` enables tests which verify that adaptors can be
+# composed in various ways.
+composition-tests = []
 
 [lib]
 path = "src/lib.rs"

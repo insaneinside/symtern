@@ -20,8 +20,8 @@ fn main() {
     assert!(hello != world);
 
     assert_eq!((Ok("Hello"), Ok("World")),
-               (pool.resolve(&hello),
-                pool.resolve(&world)));
+               ((&pool).resolve(&hello),
+                (&pool).resolve(&world)));
 
     // Since both "Hello" and "World" are short enough to be inlined, they
     // don't take up any space in the pool.

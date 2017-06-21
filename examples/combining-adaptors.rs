@@ -7,11 +7,10 @@
 // distributed except according to those terms.
 //! Demonstration of combining adaptors.
 extern crate symtern;
-use symtern::prelude::*;
-use symtern::Pool;
-use symtern::adaptors::Inline;
 
 fn main() {
+    #![allow(unused_variables, unused_mut)]
+
     /*` id=inline */ {
         use symtern::prelude::*;
         use symtern::adaptors::Inline;
@@ -29,20 +28,8 @@ fn main() {
         }            
     }
 
-    /*` id=basic-inline-luma { */ {
-        // Once we've constructed an adaptor from an existing pool, we _cannot_
-        // resolve previously-created symbols!
-        let mut basic_pool = Pool::<str,u64>::new();
-        let some_sym = basic_pool.intern("Mornin'!").expect("interning failed");
 
-        let mut inline_pool = Inline::from(basic_pool);
-        let inline_sym = inline_pool.intern("G'day").expect("interning failed");
-
-    /*    let luma_pool = Luma::from(inline_pool);
-        let luma_sym = luma_pool.intern("Why, hello there!").expect("interning failed");*/
-    }
-
-    /*/*` id=basic-luma-inline { */ {
+    /*/*` id=basic-luma-inline */ {
         let luma_inlined = Inliner::from(Luma::from(Pool::<str,u64>::new()));
         let sym = (&luma_inlined).intern("woot!");
     }*/

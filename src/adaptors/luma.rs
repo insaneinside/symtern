@@ -1,4 +1,4 @@
-// Copyright (C) 2016 Symtern Project Contributors
+// Copyright (C) 2016-2017 Symtern Project Contributors
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-Apache
 // or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -97,7 +97,7 @@ impl<'a,W> From<W> for Sym<'a, W> {
 /// let _ = pool.intern("bar").expect("failed to intern a value"); //~ PANIC already borrowed: BorrowMutError
 /// ```
 #[derive(Default)]
-pub struct Luma<W> {
+pub struct Luma<W: ?Sized> {
     wrapped: RefCell<W>
 }
 
@@ -116,20 +116,53 @@ impl<W> From<W> for Luma<W> {
     }
 }
 
-impl<'a, W, BS, BI: ?Sized> traits::Intern for &'a Luma<W>
-    where for<'b> &'b mut W: traits::Intern<Symbol=BS, Input=BI>,
-          BS: sym::Symbol + traits::Symbol
+impl<'a, W: ?Sized, WS> sym::Pool for &'a Luma<W>
+    where for<'b> &'b W: sym::Pool<Symbol=WS>,
+          WS: sym::Symbol,
 {
-    type Input = BI;
-    type Symbol = Sym<'a,BS>;
+    type Symbol = Sym<'a,WS>;
 
-    fn intern(self, input: &Self::Input) -> Result<Self::Symbol> {
-        let inner_result = self.wrapped.borrow_mut().intern(input);
-        inner_result.map(From::from)
+    #[cfg(debug_assertions)]
+    fn id(self) -> sym::PoolId {
+        let id: sym::PoolId = self.wrapped.borrow().id();
+        id
     }
 
+    #[cfg(debug_assertions)]
+    fn create_symbol(self, id: WS::Id) -> Sym<'a, WS> {
+        Sym::create(id, Self::id(self))
+    }
+
+    /// Create a new value with the given ID.
+    #[cfg(not(debug_assertions))]
+    fn create_symbol(self, id: WS::Id) -> Sym<'a, WS> {
+        Sym::create(id)
     }
 }
+
+macro_rules! impl_intern {
+    ($($mute: tt)*) => {
+        impl<'a, W, BI: ?Sized, BO> traits::Intern for &'a $($mute)* Luma<W>
+            where for<'b> &'b $($mute)* W: sym::Pool<Symbol=BO> + traits::Intern<Input=BI, Output=BO>,
+                  W: 'a,
+                  BO: 'a + sym::Symbol + traits::Symbol
+        {
+            type Input = BI;
+            type Output = Sym<'a,BO>;
+
+            fn intern(self, input: &Self::Input) -> Result<Self::Output> {
+                let inner_result = self.wrapped.borrow_mut().intern(input);
+                inner_result.map(From::from)
+            }
+        }
+    };
+}
+impl_intern!();
+
+// NOTE:  We should NOT need to implement `Intern` for `&mut Luma<W>` -- the
+// whole point of this adaptor is to use interior mutability anyway.  However,
+// implementing it reveals what may be a trait-resolution bug in rustc...
+impl_intern!(mut);
 
 macro_rules! impl_resolve {
     (by_reference) => { impl_resolve!(@impl['sym: 'a,][&'sym][&]); };
@@ -179,7 +212,20 @@ mod tests {
         let a = luma.intern(&0u64).expect("failed to intern value");
         let b = luma.intern(&1u64).expect("failed to intern value");
         assert!(a != b);
-        assert_eq!(0u64, *luma.resolve(a).unwrap());
-        assert_eq!(1u64, *luma.resolve(b).unwrap());
+        assert_eq!(0u64, luma.resolve(a).unwrap());
+        assert_eq!(1u64, luma.resolve(b).unwrap());
     }
+
+    /// Check that we can stack Inline adaptors and still resolve through
+    /// them.  This is a compile-time check:  we're verifying that the Resolve
+    /// implementation works whether the wrapped pool takes its `resolve`
+    /// argument by value *or* by reference.
+    #[cfg(feature = "composition-tests")]
+    #[test]
+    fn can_stack_lumas() {
+        let pool = Luma::<Luma<::basic::Pool<str,u32>>>::new();
+        let xy = pool.intern("xy").expect("failed to intern two-character string");
+        assert_eq!(Ok("xy"), pool.resolve(xy));
+    }
+
 }

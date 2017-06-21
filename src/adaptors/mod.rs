@@ -86,8 +86,8 @@
 //! ```rust,compile_fail file="tests/compile-fail/luma-is-lifetime-safe.rs" id="example"
 //! //` id="example" {
 //! use symtern::prelude::*;
-//! use symtern::{Pool as Basic, Sym};
-//! use symtern::adaptors::{Luma, LumaSym};
+//! use symtern::Pool as Basic;
+//! use symtern::adaptors::Luma;
 //!
 //! type Pool = Luma<Basic<str, u32>>;
 //!
@@ -108,10 +108,12 @@ mod luma;
 
 pub use self::inline::{Inline, Sym as InlineSym};
 pub use self::luma::{Luma, Sym as LumaSym};
+pub use std::cell::Ref;
 
-#[cfg(all(feature = "composition-tests", test))]
+#[cfg(all(test, feature = "composition-tests"))]
 mod tests {
     use Pool;
+    use prelude::*;
     use super::{Inline, Luma};
 
     // Check that we can use a `Inline ∘ Luma ∘ Pool` composition.
@@ -132,7 +134,7 @@ mod tests {
         let x = luma.intern("x").expect("failed to inline a value");
         let y = luma.intern("y").expect("failed to inline a value");
 
-        assert_eq!(Ok("x"), luma.resolve(&x));
-        assert_eq!(Ok("y"), luma.resolve(&y));
+        assert_eq!(Ok(true), luma.resolve(&x).map(|xs| &*xs == "x"));
+        assert_eq!(Ok(true), luma.resolve(&y).map(|ys| &*ys == "y"));
     }
 }

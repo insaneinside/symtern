@@ -34,7 +34,7 @@ pub trait Pool {
 
     /// Fetch the pool's ID.
     #[cfg(debug_assertions)]
-    fn id(&self) -> PoolId;
+    fn id(self) -> PoolId;
 
     /// Create a symbol with the specified ID.  Do **not** use this method
     /// unless you are implementing a new symbol pool or adaptor type!
@@ -44,15 +44,12 @@ pub trait Pool {
 
 /// Interface used to extract internal ID values from symbols.
 pub trait Symbol: traits::Symbol {
-    /// Primitive type underlying the symbol implementation.
+    /// Primitive type used as the symbol's underlying representation.
     type Id: SymbolId;
 
     /// Fetch the ID of the pool to which the symbol belongs.
     #[cfg(debug_assertions)]
     fn pool_id(&self) -> PoolId;
-
-    /// Fetch the symbol's ID by value.
-    fn id(&self) -> Self::Id;
 
     /// Fetch a reference to the symbol's ID.
     fn id_ref(&self) -> &Self::Id;
@@ -74,5 +71,14 @@ pub trait Create: Symbol {
     fn create(id: Self::Id) -> Self;
 }
 
+impl<'a, S> Symbol for &'a S where S: Symbol {
+    type Id = S::Id;
 
+    fn id_ref(&self) -> &Self::Id {
+        (*self).id_ref()
+    }
 
+    fn pool_id(&self) -> PoolId {
+        (*self).pool_id()
+    }
+}
