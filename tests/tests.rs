@@ -13,7 +13,7 @@ use std::path::PathBuf;
 fn run_mode<P>(mode: &'static str, path: P)
     where P: Into<Option<&'static str>>
 {
-    let mut config = compiletest::default_config();
+    let mut config = compiletest::Config::default();
     let cfg_mode = mode.parse().expect("Invalid mode");
 
     config.mode = cfg_mode;

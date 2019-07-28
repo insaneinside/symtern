@@ -17,7 +17,7 @@ use sym::{Symbol as ISymbol, Pool as IPool};
 
 
 #[cfg(debug_assertions)]
-static NEXT_POOL_ID: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
+static NEXT_POOL_ID: AtomicUsize = atomic::AtomicUsize::new(0);
 
 
 #[cfg(feature = "fnv")]
