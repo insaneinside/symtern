@@ -13,6 +13,7 @@ keywords = ["interner", "interning", "symbol", "string", "pool"]
 license = "Apache-2.0/MIT"
 
 exclude = ["scripts"]
+edition = "2018"
 
 [features]
 default = ["fnv"]

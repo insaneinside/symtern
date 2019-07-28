@@ -11,9 +11,9 @@ use std::{mem, str};
 
 use num_traits::ToPrimitive;
 
-use traits::{Intern, Resolve, Len, SymbolId};
-use {ErrorKind, Result};
-use sym::{self, Symbol};
+use crate::traits::{Intern, Resolve, Len, SymbolId};
+use crate::{ErrorKind, Result};
+use crate::sym::{self, Symbol};
 
 /// Interface used to pack strings into symbol-IDs.  Any implementations of
 /// this trait *must* store inlined-string length in the most-significant
@@ -118,7 +118,7 @@ impl<S> sym::Symbol for Sym<S>
     type Id = S::Id;
 
     #[cfg(debug_assertions)]
-    fn pool_id(&self) -> ::sym::PoolId {
+    fn pool_id(&self) -> crate::sym::PoolId {
         self.wrapped.pool_id()
     }
 
@@ -131,8 +131,8 @@ impl<S> sym::Symbol for Sym<S>
     }
 
     #[cfg(debug_assertions)]
-    fn create(id: Self::Id, pool_id: ::sym::PoolId) -> Self {
-        Sym{wrapped: <S as ::sym::Symbol>::create(id, pool_id)}
+    fn create(id: Self::Id, pool_id: crate::sym::PoolId) -> Self {
+        Sym{wrapped: <S as crate::sym::Symbol>::create(id, pool_id)}
     }
 }
 
@@ -215,7 +215,7 @@ impl<W> From<W> for Inline<W> {
 }
 
 impl<W> Len for Inline<W>
-    where W: Len + ::sym::Pool,
+    where W: Len + crate::sym::Pool,
           <<W as sym::Pool>::Symbol as sym::Symbol>::Id: Pack + ToPrimitive
 {
     /// Fetch the number of items contained in the pool.  The returned value
@@ -239,18 +239,18 @@ impl<W> Len for Inline<W>
     }
 }
 
-impl<W> ::sym::Pool for Inline<W>
+impl<W> crate::sym::Pool for Inline<W>
     where W: sym::Pool,
           <<W as sym::Pool>::Symbol as sym::Symbol>::Id: Pack,
 {
     type Symbol = W::Symbol;
 
     #[cfg(debug_assertions)]
-    fn id(&self) -> ::sym::PoolId {
+    fn id(&self) -> crate::sym::PoolId {
         self.wrapped.id()
     }
 
-    fn create_symbol(&self, id: <<W as sym::Pool>::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
+    fn create_symbol(&self, id: <<W as sym::Pool>::Symbol as crate::sym::Symbol>::Id) -> Self::Symbol {
         <W as sym::Pool>::create_symbol(&self.wrapped, id).into()
     }
 }
@@ -312,13 +312,13 @@ impl<'a, W, WS> Resolve for &'a Inline<W>
 #[cfg(test)]
 mod tests {
     use super::{Inline, Pack};
-    use sym::Symbol;
-    use traits::{Intern, Resolve, Len};
+    use crate::sym::Symbol;
+    use crate::traits::{Intern, Resolve, Len};
 
     /// Check that the pool's size is affected only by non-inlined values.
     #[test]
     fn inlined_values_do_not_affect_size() {
-        let mut pool = Inline::<::basic::Pool<str,u16>>::new();
+        let mut pool = Inline::<crate::basic::Pool<str,u16>>::new();
         assert!(pool.is_empty());
 
         // Inlined values shouldn't contribute to the pool's size.
