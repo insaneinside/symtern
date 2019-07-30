@@ -33,10 +33,10 @@ fn main() {
         // Once we've constructed an adaptor from an existing pool, we _cannot_
         // resolve previously-created symbols!
         let mut basic_pool = Pool::<str,u64>::new();
-        let some_sym = basic_pool.intern("Mornin'!").expect("interning failed");
+        let _some_sym = basic_pool.intern("Mornin'!").expect("interning failed");
 
         let mut inline_pool = Inline::from(basic_pool);
-        let inline_sym = inline_pool.intern("G'day").expect("interning failed");
+        let _inline_sym = inline_pool.intern("G'day").expect("interning failed");
 
     /*    let luma_pool = Luma::from(inline_pool);
         let luma_sym = luma_pool.intern("Why, hello there!").expect("interning failed");*/

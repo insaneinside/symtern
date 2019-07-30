@@ -17,8 +17,8 @@
 //! `use` statements for any other Symtern types you wish to use.
 // N.B. we're not using a brace-enclosed imports list here because it's harder
 // to read when rendered by rustdoc.
-pub use traits::Len as SymternLen;
-pub use traits::Intern as SymternIntern;
-pub use traits::Resolve as SymternResolve;
-pub use traits::ResolveUnchecked as SymternResolveUnchecked;
+pub use crate::traits::Len as SymternLen;
+pub use crate::traits::Intern as SymternIntern;
+pub use crate::traits::Resolve as SymternResolve;
+pub use crate::traits::ResolveUnchecked as SymternResolveUnchecked;
 

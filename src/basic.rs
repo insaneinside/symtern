@@ -11,13 +11,13 @@ use std::hash::Hash;
 use std::borrow::{Borrow, ToOwned};
 #[cfg(debug_assertions)] use std::sync::atomic::{self, AtomicUsize, Ordering};
 
-use traits::{Intern, Resolve, ResolveUnchecked, Len, SymbolId};
-use {core, Result, ErrorKind};
-use sym::{Symbol as ISymbol, Pool as IPool};
+use crate::traits::{Intern, Resolve, ResolveUnchecked, Len, SymbolId};
+use crate::{core, Result, ErrorKind};
+use crate::sym::{Symbol as ISymbol, Pool as IPool};
 
 
 #[cfg(debug_assertions)]
-static NEXT_POOL_ID: AtomicUsize = atomic::ATOMIC_USIZE_INIT;
+static NEXT_POOL_ID: AtomicUsize = atomic::AtomicUsize::new(0);
 
 
 #[cfg(feature = "fnv")]
@@ -116,7 +116,7 @@ impl<'a, T: ?Sized, I> Len for Pool<T, I>
     }
 }
 
-impl<'a, T: ?Sized, I> ::sym::Pool for Pool<T, I>
+impl<'a, T: ?Sized, I> crate::sym::Pool for Pool<T, I>
     where T: ToOwned + Eq + Hash,
           T::Owned: Eq + Hash,
           I: SymbolId
@@ -124,7 +124,7 @@ impl<'a, T: ?Sized, I> ::sym::Pool for Pool<T, I>
     type Symbol = Sym<I>;
 
     #[cfg(debug_assertions)]
-    fn id(&self) -> ::sym::PoolId {
+    fn id(&self) -> crate::sym::PoolId {
         self.pool_id
     }
 
@@ -134,7 +134,7 @@ impl<'a, T: ?Sized, I> ::sym::Pool for Pool<T, I>
     }
 
     #[cfg(debug_assertions)]
-    fn create_symbol(&self, id: <Self::Symbol as ::sym::Symbol>::Id) -> Self::Symbol {
+    fn create_symbol(&self, id: <Self::Symbol as crate::sym::Symbol>::Id) -> Self::Symbol {
         Sym::create(id, self.id())
     }
 }
@@ -167,7 +167,7 @@ impl<'a, T: ?Sized, I> Intern for &'a mut Pool<T, I>
     type Input = T;
     type Symbol = Sym<I>;
 
-    fn intern(mut self, value: &Self::Input) -> Result<Self::Symbol> {
+    fn intern(self, value: &Self::Input) -> Result<Self::Symbol> {
         let key = core::hash::<T, core::DefaultHashAlgo>(value);
         if let Some(&id) = self.ids_map.get(&key) {
             return Ok(self.create_symbol(id))
@@ -241,8 +241,8 @@ impl<'a, T: ?Sized, I> ResolveUnchecked for &'a Pool<T, I>
 #[cfg(test)]
 mod tests {
     use super::Pool;
-    use traits::*;
-    use ErrorKind;
+    use crate::traits::*;
+    use crate::ErrorKind;
 
     #[test]
     fn resolve_returns_expected_results() {

@@ -99,5 +99,5 @@ mod basic;
 pub mod adaptors;
 pub mod prelude;
 
-pub use error::{Result, Error, ErrorKind};
-pub use basic::{Pool, Sym};
+pub use crate::error::{Result, Error, ErrorKind};
+pub use crate::basic::{Pool, Sym};

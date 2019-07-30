@@ -10,7 +10,7 @@
 use std::marker::PhantomData;
 use std::cell::{RefCell, Ref};
 
-use {sym, traits, Result};
+use crate::{sym, traits, Result};
 
 /// Symbol type used by the [`Luma`](struct.Luma.html) adaptor.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
@@ -154,8 +154,8 @@ impl<W> traits::Len for Luma<W> where W: traits::Len {
     
 #[cfg(test)]
 mod tests {
-    use prelude::*;
-    use basic::Pool;
+    use crate::prelude::*;
+    use crate::basic::Pool;
     use super::Luma;
 
     /// Check that we can, in fact, intern -- and subsequently resolve -- more

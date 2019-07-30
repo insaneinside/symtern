@@ -90,7 +90,7 @@ fn resolve_with_error_handling() -> Result<()> {
 fn resolve_unchecked() -> Result<()> {
     //` id=resolve_unchecked {
     let mut pool = Pool::<str, u8>::new();
-    let sym = try!(pool.intern("abc"));
+    let sym = r#try!(pool.intern("abc"));
 
     assert_eq!("abc", unsafe { pool.resolve_unchecked(sym) });
     //` }

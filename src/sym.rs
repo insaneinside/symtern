@@ -13,7 +13,7 @@
 //! create symbols out of thin air and inspect implementation details, Bad
 //! Things™ are likely to happen if you use their methods in other contexts.
 
-use traits::{self, SymbolId};
+use crate::traits::{self, SymbolId};
 
 /// Type that will be used for `Pool::Id` in all generated `Pool` impls.
 pub type PoolId = usize;
@@ -157,13 +157,13 @@ macro_rules! make_sym {
     // @impl for unwrapped symbol types
     (@impl $name:ident < $I: ident > ; $($bound: tt)+) => {
 
-        impl<$I> ::sym::Symbol for $name<$I>
+        impl<$I> crate::sym::Symbol for $name<$I>
             where $I: $($bound)+
         {
             type Id = $I;
 
             #[cfg(debug_assertions)]
-            fn pool_id(&self) -> ::sym::PoolId {
+            fn pool_id(&self) -> crate::sym::PoolId {
                 self.pool_id
             }
 
@@ -174,7 +174,7 @@ macro_rules! make_sym {
                 $name{id: id}
             }
             #[cfg(debug_assertions)]
-            fn create(id: Self::Id, pool_id: ::sym::PoolId) -> Self {
+            fn create(id: Self::Id, pool_id: crate::sym::PoolId) -> Self {
                 $name{id: id, pool_id: pool_id}
             }
         }
@@ -202,7 +202,7 @@ macro_rules! make_sym {
         #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
         pub struct $name<$I: $($bound)+> {
             id: $I,
-            pool_id: ::sym::PoolId,
+            pool_id: crate::sym::PoolId,
         }
     };
 

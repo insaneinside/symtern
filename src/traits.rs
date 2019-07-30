@@ -188,7 +188,7 @@ pub trait Intern {
     type Input: ?Sized;
 
     /// Type used to represent interned values.
-    type Symbol: Symbol + ::sym::Symbol;
+    type Symbol: Symbol + crate::sym::Symbol;
 
     /// Fetch the symbol that corresponds to the given value.  If the value
     /// does not map to any existing symbol, create and return a new one.
